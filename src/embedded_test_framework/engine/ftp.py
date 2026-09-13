@@ -2,7 +2,7 @@ from ..logging import log_operation
 from ftplib import FTP
 from pathlib import Path
 
-from .base import Transport
+from .transport_base import Transport
 from ..errors import TransportError
 
 

@@ -1,0 +1,15 @@
+{
+  "logging": {
+    "level": "info",
+    "levels": {"engine": "debug", "server": "info", "dut": "info", "host": "warning"}
+  },
+  "devices": {
+    "linux-board": {
+      "type": "generic",
+      "metadata": {"address": "192.168.1.103", "username": "root", "platform": "Linux"},
+      "channels": {
+        "shell": {"type": "ssh", "host": "192.168.1.103", "username": "root", "password": "${DUT_SSH_PASSWORD}", "timeout": 10}
+      }
+    }
+  }
+}

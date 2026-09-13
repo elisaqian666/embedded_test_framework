@@ -1,4 +1,4 @@
-﻿# Embedded Test Framework
+# Embedded Test Framework
 
 A Python SDK for independent test repositories, requiring Python 3.11+. The framework manages communication, device lifecycles, and reusable services. Product expectations, assertions, and test reports belong in the consuming test repository.
 
@@ -206,13 +206,15 @@ Initialization manages only the framework's console handler and does not change 
 
 ## Running tests
 
+For reusable hardware test initialization, inherit from `embedded_test_framework.testing.DeviceTestBase`. It loads configuration, metadata, and logging once per class and connects/closes the device around each test. Product hooks are `setupclass`, `setup`, `teardown`, and `teardownclass`. See [the device test example](device_tests/README.md) for lifecycle details.
+
 Framework tests use pytest and reside in `unittest/`. Do not add `__init__.py` to this directory, as it could conflict with Python's standard-library `unittest` package. Communication implementations are under `engine/`, imported through `embedded_test_framework.engine`. Transport class names and the `register_transport()` extension interface remain unchanged.
 
 | Test file | Implementation covered |
 | --- | --- |
-| `test_engine.py` | engine/base, command, ftp, http, memory, serial |
-| `test_devices.py` | devices/base capability routing and channel constraints |
-| `test_hosts.py` | hosts/base, local, and host discovery services |
+| `test_engine.py` | engine/transport_base, command, ftp, http, memory, serial |
+| `test_devices.py` | devices/device_base capability routing and channel constraints |
+| `test_hosts.py` | hosts/host_base, local, and host discovery services |
 | `test_services.py` | System, health polling, and file services |
 | `test_config.py` | Configuration validation, factories, and registration |
 | `test_errors.py` | Public exception contracts |

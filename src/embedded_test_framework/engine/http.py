@@ -6,7 +6,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from .base import HttpResponse, Transport
+from .transport_base import HttpResponse, Transport
 from ..errors import ConfigurationError, OperationTimeout, TransportError
 
 

@@ -4,7 +4,7 @@ import time
 from .host import HostService
 
 from ..errors import OperationTimeout, TransportError
-from ..engine.base import positive_timeout
+from ..engine.transport_base import positive_timeout
 
 
 class SystemService:

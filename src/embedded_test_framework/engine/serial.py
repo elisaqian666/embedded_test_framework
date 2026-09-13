@@ -2,7 +2,7 @@ from ..logging import log_operation
 import threading
 import time
 
-from .base import Transport
+from .transport_base import Transport
 from ..errors import ConfigurationError, OperationTimeout, TransportError
 
 

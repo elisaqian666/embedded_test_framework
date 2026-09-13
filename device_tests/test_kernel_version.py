@@ -1,26 +1,23 @@
-"""Explicit hardware test; excluded from the default unittest suite."""
-import os
+﻿"""Hardware example using the common device test lifecycle."""
+from pathlib import Path
 
-import pytest
-
-from embedded_test_framework import Device
-from embedded_test_framework.engine import SSHTransport
+from embedded_test_framework.testing import DeviceTestBase
 
 
-def test_kernel_version():
-    password = os.environ.get("DUT_SSH_PASSWORD")
-    if not password:
-        pytest.skip("Set DUT_SSH_PASSWORD to run the real-device test")
+class TestKernelVersion(DeviceTestBase):
+    config_path = Path(__file__).with_name("devices.json")
+    device_name = "linux-board"
+    required_environment = ("DUT_SSH_PASSWORD",)
 
-    ssh = SSHTransport(
-        host="192.168.1.103",
-        username="root",
-        password=password,
-        timeout=10,
-    )
-    with Device("linux-board", {"shell": ssh}) as device:
-        result = device.execute("uname -r", timeout=10)
+    def test_kernel_version(self):
+        # given: A Linux device connected over SSH by DeviceTestBase.
+        self.logger.info("Checking kernel version on %s", self.device_info["metadata"]["address"])
+
+        # when: Query the running kernel version.
+        result = self.device.execute("uname -r", timeout=10)
+
+        # then: The command succeeds and returns a nonempty kernel version.
         assert result.exit_code == 0, f"uname -r failed: {result.stderr}"
         kernel_version = result.stdout.strip()
         assert kernel_version, "uname -r returned an empty kernel version"
-        print(f"Kernel version: {kernel_version}")
+        self.logger.info("Kernel version: %s", kernel_version)

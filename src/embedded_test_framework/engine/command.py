@@ -3,7 +3,7 @@ from ..logging import log_operation
 import subprocess
 import time
 
-from .base import CommandResult, Transport
+from .transport_base import CommandResult, Transport
 from ..errors import ConfigurationError, OperationTimeout, TransportError
 
 

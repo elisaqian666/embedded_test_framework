@@ -8,9 +8,9 @@ import socket
 import subprocess
 import time
 
-from .base import Host, Peripheral, ProcessInfo
+from .host_base import Host, Peripheral, ProcessInfo
 from ..errors import CapabilityError, CleanupError, ConfigurationError, OperationTimeout, TransportError
-from ..engine.base import CommandResult, positive_timeout
+from ..engine.transport_base import CommandResult, positive_timeout
 
 
 def _arguments(args):

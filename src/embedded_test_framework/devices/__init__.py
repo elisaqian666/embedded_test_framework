@@ -1,3 +1,3 @@
-from .base import Device
+from .device_base import Device
 
 __all__ = ["Device"]

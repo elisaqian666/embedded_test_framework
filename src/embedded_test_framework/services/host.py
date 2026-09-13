@@ -3,7 +3,7 @@ from ..logging import get_logger, log_operation
 import time
 
 from ..errors import ConfigurationError, OperationTimeout
-from ..engine.base import positive_timeout
+from ..engine.transport_base import positive_timeout
 
 
 class HostService:

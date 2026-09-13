@@ -1,4 +1,4 @@
-"""Offline tests for engine/base, command, ftp, http, memory and serial."""
+"""Offline tests for engine/transport_base, command, ftp, http, memory and serial."""
 import subprocess
 import sys
 from types import SimpleNamespace

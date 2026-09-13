@@ -1,4 +1,4 @@
-from .base import Transport, CommandChannel, RequestChannel, ByteChannel, FileChannel, CommandResult, HttpResponse
+from .transport_base import Transport, CommandChannel, RequestChannel, ByteChannel, FileChannel, CommandResult, HttpResponse
 from .http import HttpTransport
 from .command import SSHTransport, ADBTransport
 from .serial import SerialTransport
