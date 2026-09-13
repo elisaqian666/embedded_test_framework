@@ -1,0 +1,11 @@
+{
+  "logging": {
+    "level": "info",
+    "levels": {
+      "engine": "debug",
+      "server": "info",
+      "dut": "info",
+      "host": "warning"
+    }
+  }
+}

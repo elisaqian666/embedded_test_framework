@@ -1,47 +1,47 @@
-# Embedded Test Framework
+﻿# Embedded Test Framework
 
-面向独立测试用例仓库的 Python SDK，Python 3.11+。框架负责通信、设备生命周期和可复用服务；产品预期、断言和测试报告由用例仓库负责。
+A Python SDK for independent test repositories, requiring Python 3.11+. The framework manages communication, device lifecycles, and reusable services. Product expectations, assertions, and test reports belong in the consuming test repository.
 
-## 分层与目录
+## Architecture and directories
 
 ```text
-独立用例仓库：pytest / unittest / 自定义运行器
-                        ↓
-services：SystemService / HealthService / FileService / 产品服务
-                        ↓
-devices：Device（组合多个命名通道，可继承扩展）
-                        ↓                    ↘
-engine：CommandChannel / RequestChannel / ByteChannel / FileChannel
-                        ↓               hosts：LocalHost（主机软件、进程、外设）
-                        ↓
-SSH / ADB / HTTP / Serial / FTP / Memory / 自定义驱动
+Independent test repository: pytest / unittest / custom runner
+                        |
+services: SystemService / HealthService / FileService / product services
+                        |
+devices: Device (multiple named channels; extensible through subclasses)
+                        |                         |
+engine: CommandChannel / RequestChannel / ByteChannel / FileChannel
+                        |                 hosts: LocalHost
+                        |                 (applications, processes, peripherals)
+SSH / ADB / HTTP / Serial / FTP / Memory / custom drivers
 
 src/embedded_test_framework/
-  engine/        通信实现、能力接口、结果类型
-  devices/           与测试运行器无关的设备对象
-  hosts/             主机操作、应用生命周期、进程和外设枚举
-  services/          可复用应用流程
-  config.py          配置加载、设备工厂、扩展注册
-  errors.py          公共异常
-  pytest_plugin.py   可选 pytest 集成
-configs/             真实设备配置模板
-examples/external_tests/  可复制到独立仓库的离线示例
-unittest/            框架自身测试
+  engine/            Communication implementations, capabilities, result types
+  devices/           Device objects independent of test runners
+  hosts/             Host operations, application lifecycles, process/peripheral inventory
+  services/          Reusable application workflows
+  config.py          Configuration loading, device factory, extension registry
+  errors.py          Public exceptions
+  pytest_plugin.py   Optional pytest integration
+configs/             Real-device configuration templates
+examples/external_tests/  Offline examples to copy into a separate repository
+unittest/            Framework tests
 ```
 
-核心包只依赖标准库。串口按需安装 pyserial；SSH 使用系统 OpenSSH，ADB 使用 Android platform tools。HTTP 的 connect 仅建立逻辑状态，实际可达性由请求或健康服务验证；SSH 会执行 `true` 验证认证，默认要求 known_hosts 中已有主机密钥，默认使用密钥/agent 认证；传入 password 时使用可选 Paramiko（安装 `[ssh]`）建立密码会话。SSH 命令接口适用于 POSIX shell。
+The core package uses only the standard library. Install pyserial when serial communication is needed. SSH uses system OpenSSH by default, and ADB uses Android platform tools. HTTP `connect()` only establishes logical state; requests or health services verify reachability. OpenSSH authentication is checked by executing `true`, and the host key must already be in known_hosts. Key/agent authentication is the default; passing `password` uses an optional Paramiko session (install `[ssh]`). The SSH command interface targets POSIX shells.
 
-## 安装与独立仓库使用
+## Installation and use from a separate repository
 
-在用例仓库的虚拟环境中安装本项目（将路径替换为实际目录）：
+Install this project into the test repository's virtual environment, replacing the path as needed:
 
 ```powershell
 python -m pip install -e "D:/work_project/embedded_test_framework[test,serial]"
 ```
 
-发布时在框架仓库执行 `python -m pip wheel . --no-deps -w dist`，将 wheel 发布至内部制品库；用例仓库固定版本，如 `embedded-test-framework==0.2.0`。发行包仅包含 `src/embedded_test_framework` 下的 SDK。`build/`、`dist/`、`*.egg-info/` 为自动生成的构建产物，无需提交或手动维护。
+To release the SDK, run `python -m pip wheel . --no-deps -w dist` in the framework repository and publish the wheel to your internal artifact repository. Pin the version in consuming repositories, for example `embedded-test-framework==0.2.0`. The distribution contains only the SDK under `src/embedded_test_framework`. The `build/`, `dist/`, and `*.egg-info/` directories are generated build artifacts and do not need to be committed or maintained manually.
 
-普通 Python 调用：
+Plain Python usage:
 
 ```python
 from embedded_test_framework import load_device
@@ -57,9 +57,9 @@ with load_device("devices.json", "dut") as device:
     raw = device.exchange(b"AT\r\n", delimiter=b"\r\n")
 ```
 
-根据设备实际能力从 `configs/devices.example.json` 删除不需要的通道。`${DUT_HOST}` 等变量在加载时读取环境，缺失立即报错；构造对象不连接硬件。配置只接受显式注册的类型，不执行配置中的 Python 导入。串口 exchange 不自动补命令结束符，必须由设备驱动编码；超时即使收到部分回复也报错。
+Remove unused channels from `configs/devices.example.json` to match the device's capabilities. Variables such as `${DUT_HOST}` are resolved from the environment during loading; missing variables cause an immediate error. Constructing an object does not connect to hardware. Configuration accepts only explicitly registered types and does not execute Python imports. Serial `exchange()` does not append command terminators: the device driver must encode them. A timeout raises an error even if part of the reply has arrived.
 
-pytest 用例仓库：
+In a pytest test repository:
 
 ```python
 # conftest.py
@@ -76,46 +76,46 @@ def test_version(dut):
 pytest --device-config devices.json --device-name dut
 ```
 
-fixture 每个用例独立连接和释放；相对配置路径以 pytest rootdir 为基准。插件需显式启用，不自动影响其他测试项目。可将 `examples/external_tests` 内容复制到独立仓库直接运行，其中 MemoryTransport 不需要任何硬件。
+The fixture connects and releases resources for each test. Relative configuration paths are resolved against pytest's rootdir. Enable the plugin explicitly; it does not automatically affect other test projects. Copy `examples/external_tests` into a separate repository to run the examples. MemoryTransport requires no hardware.
 
-## 主机层：软件、进程和外设
+## Host layer: applications, processes, and peripherals
 
-`Device.host` 默认是运行 Python 的本机，可在 `device.connect()` 前使用。主机层与通信层协作：主机层管理测试环境，通信层负责与板子交换数据。配置中的 `host.name` 是标签，不是远程地址。
+`Device.host` defaults to the local machine running Python and can be used before `device.connect()`. The host layer manages the test environment while the communication layer exchanges data with the board. The configured `host.name` is a label, not a remote address.
 
 ```python
 from embedded_test_framework import load_device
 from embedded_test_framework.services import HostService
 
-# load_device 只构造对象，此时无需串口已连接。
+# Only construct the device; the serial port does not need to be connected yet.
 device = load_device("devices.json")
 try:
     board = HostService(device.host).wait_for_peripheral(
         kind="serial", vid=0x1234, pid=0x5678,
         serial_number="board-001", timeout=15,
     )
-    print(board.identifier)  # 例如 COM3；需与设备 console 配置一致
+    print(board.identifier)  # For example, COM3; must match the console configuration.
     with device.host.start_application(
         [r"C:\Tools\BoardMonitor.exe", "--port", board.identifier], visible=True
     ) as app:
         assert app.running
-        # 应用启动不等于业务就绪；产品服务应继续检查窗口/API/日志状态。
+        # A started process is not necessarily ready; check its window, API, or logs.
 finally:
     device.close()
 ```
 
-主机软件若独占串口，需先关闭软件，再连接设备串口通道。`start_application` 传可执行文件和参数列表，默认请求隐藏 Windows 窗口，需展示交互窗口时传 `visible=True`；不提供点击菜单等 GUI 自动化。
+If host software exclusively owns the serial port, close it before connecting the device's serial channel. Pass an executable and an argument list to `start_application`. Windows windows are requested to be hidden by default; pass `visible=True` for an interactive window. GUI automation such as clicking menus is not provided.
 
 ```python
 processes = device.host.list_processes()
-running = device.host.is_process_running("BoardMonitor.exe")  # 完整进程名，忽略大小写
-usb_devices = device.host.list_peripherals(kind="usb")        # Windows 当前在场 USB 设备
-all_devices = device.host.list_peripherals(kind="pnp")        # Windows 当前在场 PnP 设备
-serial_ports = device.host.list_peripherals(kind="serial")    # 跨平台串口
+running = device.host.is_process_running("BoardMonitor.exe")  # Full name, case-insensitive.
+usb_devices = device.host.list_peripherals(kind="usb")        # Present Windows USB devices.
+all_devices = device.host.list_peripherals(kind="pnp")        # Present Windows PnP devices.
+serial_ports = device.host.list_peripherals(kind="serial")    # Cross-platform serial ports.
 ```
 
-安装 `embedded-test-framework[host]` 提供串口枚举与非 Windows 进程枚举依赖。Windows 进程/PnP 枚举使用 PowerShell；PnP/USB 可按完整 InstanceId 或 VID/PID 匹配，USB 序列号不从 InstanceId 猜测。串口序列号由 pyserial 提供。`HostService.find_peripherals(..., healthy_only=True)` 可过滤系统报告的异常设备，但枚举成功不代表板子通信或固件正常。
+Install `embedded-test-framework[host]` for serial enumeration and non-Windows process enumeration dependencies. Windows process/PnP enumeration uses PowerShell. Match PnP/USB devices by full InstanceId or VID/PID; USB serial numbers are not inferred from InstanceId. Serial-port serial numbers come from pyserial. `HostService.find_peripherals(..., healthy_only=True)` filters devices reported as unhealthy by the OS, but successful enumeration does not establish that board communication or firmware is working.
 
-设备默认拥有内部创建的主机，关闭设备时释放其启动的应用；手动注入 `Device(..., host=shared_host)` 时主机由调用方管理，适合多板共用一台主机：
+A device owns its internally created host by default and releases applications started through that host when closed. With `Device(..., host=shared_host)`, the caller manages the host lifecycle, allowing multiple boards to share one host:
 
 ```python
 from embedded_test_framework import Device, LocalHost
@@ -126,18 +126,18 @@ with LocalHost() as host:
         print(board.host.name)
 ```
 
-应用句柄只管理直接创建的进程，不终止已有同名程序或整个进程树；启动器派生进程、GUI 应用自行忽略隐藏提示等行为需产品适配。外设等待的 timeout 是轮询预算，单次枚举还受主机命令 timeout 限制，可能超出轮询预算。
+An application handle manages only the process it directly created. It does not terminate existing processes with the same name or an entire process tree. Product adapters must handle launchers that spawn child processes and GUI applications that ignore window visibility hints. Peripheral wait timeouts are polling budgets; individual enumeration calls also use the host command timeout and may exceed the polling budget.
 
-可继承 `Host` 并通过 `Registry.register_host` 扩展实验室主机实现。当前通信驱动仍在本机执行；远程主机代理还需要对应的远程通信驱动，修改主机标签不会自动把串口或 ADB 转到远程执行。
+Subclass `Host` and register it with `Registry.register_host` to add a laboratory host implementation. Current communication drivers still execute locally. A remote host agent also needs corresponding remote communication drivers; changing a host label does not redirect serial or ADB execution to a remote machine.
 
-## 扩展设备和服务
+## Extending devices and services
 
 ```python
 from embedded_test_framework import Device, Registry, load_device
 
 class SensorBoard(Device):
     def temperature(self):
-        # 产品命令和解析放在设备适配器，原始串口保持字节语义。
+        # Keep product commands/parsing in the adapter and raw serial data as bytes.
         raw = self.exchange(b"TEMP?\n", delimiter=b"\n")
         return float(raw.decode("ascii").strip())
 
@@ -150,53 +150,88 @@ class TemperatureService:
 
 registry = Registry.defaults()
 registry.register_device("sensor-board", SensorBoard)
-# 配置中设备 type 设为 sensor-board。
+# Set the device type to sensor-board in the configuration.
 with load_device("devices.json", registry=registry) as board:
     assert all(0 <= value <= 80 for value in TemperatureService(board).sample())
 ```
 
-新增 CAN、Modbus、BLE、JTAG 等协议：继承 `Transport` 实现 connect/close，再实现所需的能力方法（例如 exchange），通过 `registry.register_transport("can", MyCanTransport)` 注册。构造函数只存配置，connect 负责打开资源，close 必须可重复调用。不同设备对象不得共享同一 transport。专有寄存器、烧录、复位语义在设备子类中实现，不强行映射成 HTTP request。
+To add CAN, Modbus, BLE, JTAG, or another protocol, subclass `Transport`, implement `connect()` and `close()`, and implement the required capability methods such as `exchange()`. Register it with `registry.register_transport("can", MyCanTransport)`. Constructors should only store configuration; `connect()` opens resources and `close()` must be repeatable. Different device objects must not share a transport instance. Implement product-specific register access, flashing, and reset behavior in device subclasses rather than forcing it into an HTTP request interface.
 
-在用例仓库覆盖 `device_registry` fixture，返回包含产品扩展的 Registry 即可。BLE GATT 通信需要增加独立适配器。
+Override the `device_registry` fixture in the consuming repository to return a Registry containing product extensions. BLE GATT communication requires a separate adapter.
 
-## 行为约定
+## Behavioral contracts
 
-- 设备对象不继承 unittest.TestCase；断言留在用例中，统一通过 `embedded_test_framework` 包调用。
-- 命令返回 CommandResult，非零退出码由 `.check()` 转为异常；HTTP 返回 HttpResponse，包含非 2xx 状态，由服务或用例判断。
-- 连接失败按逆序释放已尝试打开的通道；关闭时尝试所有通道并汇总 CleanupError。上下文中的原始异常不会被关闭异常覆盖。
-- 不自动重试写操作；HealthService 仅轮询 GET 健康接口。timeout 是单次通信预算，HTTP/FTP 标准库超时是阻塞 I/O 超时，并非严格端到端截止时间；SSH/ADB subprocess 和串口 exchange 受总执行预算约束。
-- 库仅使用标准 logging，不配置根 logger、不记录凭据或完整配置。结果内容由消费者决定是否落盘。
-- 默认不提供跨进程设备锁。pytest-xdist 下应为 worker 分配不同物理设备，或在用例仓库实现实验室资源租约。
-- FTP 下载失败可能留下部分本地文件，上传失败可能留下部分远端文件；固件烧录/升级流程应由产品服务实现校验及恢复逻辑。
+- Device objects do not inherit from unittest.TestCase. Keep assertions in tests and access the SDK through `embedded_test_framework`.
+- Commands return CommandResult; `.check()` converts a nonzero exit code into an exception. HTTP returns HttpResponse, including non-2xx statuses, for the service or test to evaluate.
+- Failed connections release attempted channels in reverse order. Closing attempts all channels and aggregates failures in CleanupError. Cleanup exceptions do not replace the original exception from a context body.
+- Write operations are not retried automatically. HealthService polls only the GET health endpoint. Timeouts are operation budgets; standard-library HTTP/FTP timeouts apply to blocking I/O, not strict end-to-end deadlines. SSH/ADB subprocesses and serial exchanges have total execution budgets.
+- The library uses standard logging with explicit package console configuration. It does not configure the root logger or record credentials or complete configurations. Consumers decide whether to persist result contents.
+- Cross-process device locking is not provided by default. With pytest-xdist, assign different physical devices to workers or implement laboratory resource leases in the consuming repository.
+- Failed FTP downloads may leave partial local files; failed uploads may leave partial remote files. Product services should implement verification and recovery for firmware flashing and upgrades.
 
-## 框架验证
+## Logging configuration
 
-框架测试统一放在 `unittest/`，使用 pytest；该目录不要添加 `__init__.py`，以免与 Python 标准库 `unittest` 冲突。`engine/` 是通信实现的新目录，导入路径为 `embedded_test_framework.engine`；Transport 类名与 `register_transport()` 扩展接口保持不变。
+Use `configs/logging.json` as a standalone configuration, or add the same top-level `logging` field to a device JSON file:
 
-| 测试文件 | 对应实现 |
+```json
+{
+  "logging": {
+    "level": "info",
+    "levels": {"engine": "debug", "server": "info", "dut": "info", "host": "warning"}
+  }
+}
+```
+
+Supported levels are `debug`, `info`, `warning`, and `error`, case-insensitively. `level` sets the default minimum severity; `levels` overrides individual categories. The categories are engine for communication, server for services, dut for devices, and host for host operations.
+
+```python
+from embedded_test_framework import load_logging_config, get_logger
+
+load_logging_config("configs/logging.json")
+logger = get_logger("dut", "linux-board")
+logger.info("Starting the kernel version check")
+```
+
+Loading a device configuration containing `logging` through `load_device()` or the pytest `dut` fixture initializes logging automatically. When constructing Device/SSHTransport directly, call the initialization function first. Device configurations without `logging` preserve the current settings. You can also initialize in code with `configure_logging({"level": "debug"})`.
+
+Example console output:
+
+```text
+2026-09-14 10:00:00 DEBUG   [engine] [SSHTransport] execute started
+2026-09-14 10:00:00 INFO    [engine] [SSHTransport] execute completed
+2026-09-14 10:00:00 INFO    [dut] [linux-board] Starting the kernel version check
+```
+
+Initialization manages only the framework's console handler and does not change the root logger. Repeated initialization does not accumulate framework handlers. Configuration is shared within the process: the last explicit configuration wins, and categories without overrides resume inheriting the default level. Built-in logs contain only operation names, success status, and exception types, excluding passwords, command arguments, and response bodies. Callers are responsible for custom log contents. Use pytest's `-s` option to view console output as it happens.
+
+## Running tests
+
+Framework tests use pytest and reside in `unittest/`. Do not add `__init__.py` to this directory, as it could conflict with Python's standard-library `unittest` package. Communication implementations are under `engine/`, imported through `embedded_test_framework.engine`. Transport class names and the `register_transport()` extension interface remain unchanged.
+
+| Test file | Implementation covered |
 | --- | --- |
-| `test_engine.py` | engine/base、command、ftp、http、memory、serial |
-| `test_devices.py` | devices/base 的能力路由和通道约束 |
-| `test_hosts.py` | hosts/base、local，以及主机发现服务 |
-| `test_services.py` | 系统、健康轮询、文件服务 |
-| `test_config.py` | 配置校验、工厂与注册 |
-| `test_errors.py` | 公共异常契约 |
-| `test_pytest_plugin.py` | 独立进程中的 pytest fixture 初始化和释放 |
-| `test_framework.py` | 跨模块回归、本地 HTTP、设备回滚、环境变量 |
+| `test_engine.py` | engine/base, command, ftp, http, memory, serial |
+| `test_devices.py` | devices/base capability routing and channel constraints |
+| `test_hosts.py` | hosts/base, local, and host discovery services |
+| `test_services.py` | System, health polling, and file services |
+| `test_config.py` | Configuration validation, factories, and registration |
+| `test_errors.py` | Public exception contracts |
+| `test_pytest_plugin.py` | pytest fixture setup and cleanup in a separate process |
+| `test_framework.py` | Cross-module regression, local HTTP, device rollback, environment variables |
 
 ```powershell
 python -m pytest unittest
 python -m pytest examples/external_tests --device-config examples/external_tests/devices.json
 ```
 
-测试覆盖离线调用、真实本地 HTTP 请求、连接失败回滚、清理异常、配置环境变量、扩展注册、SSH 连接失败和串口超时。真实 SSH/ADB/串口/FTP 设备需在实验室集成验证。
+Tests cover offline usage, real local HTTP requests, connection rollback, cleanup errors, configuration environment variables, extension registration, SSH connection failures, and serial timeouts. Real SSH/ADB/serial/FTP devices require laboratory integration testing.
 
 ## Jenkins
 
-根目录 `Jenkinsfile` 使用 Declarative Pipeline，按检出、创建虚拟环境、单元测试、用例示例、wheel 构建顺序执行。测试失败仍发布 JUnit XML，成功后归档 wheel；不会发布到制品库或连接真实硬件。
+The root `Jenkinsfile` uses Declarative Pipeline to check out the repository, create a virtual environment, run unit tests and consumer examples, and build a wheel. Test stages publish JUnit XML even on failure, and successful builds archive the wheel. The pipeline does not publish to an artifact repository or connect to real hardware.
 
-Jenkins 节点需安装 Python 3.11+（Windows PATH 提供 `python`，Unix 提供 `python3`），能访问所需 Python 包源，并安装 Pipeline、Git 和 JUnit 插件。创建 Pipeline from SCM 或 Multibranch Pipeline，将脚本路径设为 `Jenkinsfile`。流水线检出前清理分配给任务的工作区，请使用专用 Jenkins 工作区。
+Jenkins agents need Python 3.11+ (`python` on Windows PATH or `python3` on Unix), access to the required Python package sources, and the Pipeline, Git, and JUnit plugins. Create a Pipeline from SCM or Multibranch Pipeline and set the script path to `Jenkinsfile`. The pipeline cleans its allocated workspace before checkout; use a dedicated Jenkins workspace.
 
-本地生成同格式报告：`python -m pytest unittest --junitxml=reports/unit.xml`。流水线语法与报告步骤参考 [Jenkins Pipeline 文档](https://www.jenkins.io/doc/book/pipeline/syntax/) 和 [JUnit 步骤文档](https://www.jenkins.io/doc/pipeline/steps/junit/)。
+Generate the same report locally with `python -m pytest unittest --junitxml=reports/unit.xml`. See the [Jenkins Pipeline documentation](https://www.jenkins.io/doc/book/pipeline/syntax/) and [JUnit step documentation](https://www.jenkins.io/doc/pipeline/steps/junit/) for syntax and report steps.
 
-实际 SSH 设备用例见 [device_tests/README.md](device_tests/README.md)，包括登录设备执行 uname -r 的运行说明。
+See [device_tests/README.md](device_tests/README.md) for the real SSH device example, including instructions for logging in and executing `uname -r`.

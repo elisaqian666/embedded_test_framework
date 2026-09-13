@@ -1,3 +1,4 @@
+from ..logging import log_operation
 import threading
 import time
 
@@ -13,6 +14,7 @@ class SerialTransport(Transport):
         self._serial = None
         self._lock = threading.RLock()
 
+    @log_operation
     def connect(self):
         with self._lock:
             if self.connected:
@@ -29,6 +31,7 @@ class SerialTransport(Transport):
             self.connected = True
             return self
 
+    @log_operation
     def close(self):
         with self._lock:
             try:
@@ -38,6 +41,7 @@ class SerialTransport(Transport):
                 self._serial = None
                 self.connected = False
 
+    @log_operation
     def exchange(self, data, *, delimiter=b"\n", timeout=None):
         if not isinstance(data, bytes) or not isinstance(delimiter, bytes) or not delimiter:
             raise ConfigurationError("exchange requires bytes and a nonempty byte delimiter")

@@ -7,6 +7,7 @@ import re
 from .devices import Device
 from .hosts import Host, LocalHost
 from .errors import ConfigurationError
+from .logging import configure_logging
 from .engine import HttpTransport, SSHTransport, ADBTransport, SerialTransport, FTPTransport, MemoryTransport, Transport
 
 
@@ -112,8 +113,11 @@ def load_device(path, name="dut", *, registry=None):
         document = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         raise ConfigurationError("Cannot read device inventory JSON") from exc
-    if not isinstance(document, dict) or set(document) != {"devices"} or not isinstance(document["devices"], dict):
+    if not isinstance(document, dict) or set(document) - {"devices", "logging"} or not isinstance(document.get("devices"), dict):
         raise ConfigurationError("Inventory must contain a devices object")
     if name not in document["devices"]:
         raise ConfigurationError(f"Device {name!r} not found in inventory")
-    return DeviceFactory(registry).create(name, document["devices"][name])
+    device = DeviceFactory(registry).create(name, document["devices"][name])
+    if "logging" in document:
+        configure_logging(document["logging"])
+    return device

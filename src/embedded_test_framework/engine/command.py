@@ -1,3 +1,4 @@
+from ..logging import log_operation
 """Command transports backed by installed OpenSSH and Android platform tools."""
 import subprocess
 import time
@@ -18,6 +19,7 @@ class ProcessTransport(Transport):
             raise TransportError("Cannot start command client; check executable and PATH") from exc
         return CommandResult(command, result.stdout, result.stderr, result.returncode, time.monotonic() - started)
 
+    @log_operation
     def close(self):
         self.connected = False
 
@@ -38,6 +40,7 @@ class SSHTransport(ProcessTransport):
         self._password = password
         self._client = None
 
+    @log_operation
     def connect(self):
         if not self.connected:
             if self._password is None:
@@ -61,6 +64,7 @@ class SSHTransport(ProcessTransport):
             self.connected = True
         return self
 
+    @log_operation
     def execute(self, command, *, timeout=None):
         self.require_connected()
         if self._client is not None:
@@ -93,6 +97,7 @@ class SSHTransport(ProcessTransport):
                     channel.close()
         return self._run(self.args + [command], command, timeout)
 
+    @log_operation
     def close(self):
         try:
             if self._client is not None:
@@ -107,6 +112,7 @@ class ADBTransport(ProcessTransport):
         super().__init__(timeout)
         self.args = ["adb"] + (["-s", device] if device else [])
 
+    @log_operation
     def connect(self):
         if not self.connected:
             result = self._run(self.args + ["get-state"], "get-state", None).check()
@@ -115,6 +121,7 @@ class ADBTransport(ProcessTransport):
             self.connected = True
         return self
 
+    @log_operation
     def execute(self, command, *, timeout=None):
         self.require_connected()
         return self._run(self.args + ["shell", command], command, timeout)

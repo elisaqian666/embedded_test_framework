@@ -1,5 +1,5 @@
+from ..logging import get_logger, log_operation
 """Device composition independent of pytest/unittest and product assertions."""
-import logging
 
 from ..errors import CapabilityError, CleanupError, ConfigurationError, TransportError
 from ..engine import CommandChannel, RequestChannel, ByteChannel, FileChannel
@@ -18,8 +18,9 @@ class Device:
         self._channels = dict(channels)
         self.metadata = dict(metadata or {})
         self.connected = False
-        self.logger = logging.getLogger(f"embedded_test_framework.device.{name}")
+        self.logger = get_logger("dut", name)
 
+    @log_operation
     def connect(self):
         if self.connected:
             return self
@@ -41,9 +42,9 @@ class Device:
                     exc.add_note(f"Host rollback failed: {type(cleanup).__name__}")
             raise
         self.connected = True
-        self.logger.info("Device connected")
         return self
 
+    @log_operation
     def close(self):
         errors = []
         for transport in reversed(list(self._channels.values())):

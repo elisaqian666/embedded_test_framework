@@ -1,3 +1,4 @@
+from ..logging import get_logger, log_operation
 """Host-side board discovery, usable before a device transport is opened."""
 import time
 
@@ -7,8 +8,10 @@ from ..engine.base import positive_timeout
 
 class HostService:
     def __init__(self, host):
+        self.logger = get_logger("server", type(self).__name__)
         self.host = host
 
+    @log_operation
     def find_peripherals(self, *, kind="serial", identifier=None, vid=None, pid=None,
                          serial_number=None, healthy_only=False):
         if all(value is None for value in (identifier, vid, pid, serial_number)):
@@ -19,6 +22,7 @@ class HostService:
                 and (serial_number is None or p.serial_number == serial_number)
                 and (not healthy_only or p.status.casefold() in ("ok", "present"))]
 
+    @log_operation
     def wait_for_peripheral(self, *, timeout=10.0, interval=0.2, **criteria):
         deadline = time.monotonic() + positive_timeout(timeout)
         positive_timeout(interval)

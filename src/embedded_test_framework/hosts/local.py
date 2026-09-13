@@ -1,3 +1,4 @@
+from ..logging import get_logger, log_operation
 """The machine running Python; no implicit execution on remote hosts."""
 import json
 import os
@@ -65,9 +66,11 @@ class Application:
 class LocalHost(Host):
     def __init__(self, name=None, *, timeout=10.0):
         self.name = name or socket.gethostname()
+        self.logger = get_logger("host", self.name)
         self.timeout = positive_timeout(timeout)
         self._applications = []
 
+    @log_operation
     def run(self, args, *, timeout=None, cwd=None):
         args = _arguments(args)
         duration = self.timeout if timeout is None else positive_timeout(timeout)
@@ -83,6 +86,7 @@ class LocalHost(Host):
         return CommandResult(subprocess.list2cmdline(args), result.stdout, result.stderr,
                              result.returncode, time.monotonic() - started)
 
+    @log_operation
     def start_application(self, args, *, cwd=None, visible=False):
         """Start an executable; success means spawned, not application readiness."""
         args = _arguments(args)
@@ -105,6 +109,7 @@ class LocalHost(Host):
             raise TransportError("Invalid PowerShell inventory response") from exc
         return data if isinstance(data, list) else [data]
 
+    @log_operation
     def list_processes(self):
         if platform.system() == "Windows":
             rows = self._powershell_json("@(Get-CimInstance Win32_Process | Select-Object ProcessId,Name) | ConvertTo-Json -Compress")
@@ -115,6 +120,7 @@ class LocalHost(Host):
             raise ConfigurationError("Install embedded-test-framework[host] for process enumeration") from exc
         return [ProcessInfo(p.info["pid"], p.info["name"]) for p in psutil.process_iter(["pid", "name"]) if p.info["name"]]
 
+    @log_operation
     def list_peripherals(self, *, kind="serial"):
         if kind == "serial":
             try:

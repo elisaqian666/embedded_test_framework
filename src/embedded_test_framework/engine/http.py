@@ -1,3 +1,4 @@
+from ..logging import log_operation
 """Standard-library HTTP transport; no automatic replay of requests."""
 import json
 import socket
@@ -18,14 +19,17 @@ class HttpTransport(Transport):
         self.base_url = base_url.rstrip("/")
         self.headers = dict(headers or {})
 
+    @log_operation
     def connect(self):
         # HTTP has no persistent authenticated session: health is checked by services.
         self.connected = True
         return self
 
+    @log_operation
     def close(self):
         self.connected = False
 
+    @log_operation
     def request(self, method, path, *, payload=None, params=None, headers=None, timeout=None):
         self.require_connected()
         duration = self.operation_timeout(timeout)

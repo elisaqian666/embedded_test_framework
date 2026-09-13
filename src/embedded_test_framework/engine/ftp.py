@@ -1,3 +1,4 @@
+from ..logging import log_operation
 from ftplib import FTP
 from pathlib import Path
 
@@ -12,6 +13,7 @@ class FTPTransport(Transport):
         self.username, self.password = username, password
         self._client = None
 
+    @log_operation
     def connect(self):
         if self.connected:
             return self
@@ -25,6 +27,7 @@ class FTPTransport(Transport):
         self._client, self.connected = client, True
         return self
 
+    @log_operation
     def close(self):
         try:
             if self._client is not None:
@@ -32,6 +35,7 @@ class FTPTransport(Transport):
         finally:
             self._client, self.connected = None, False
 
+    @log_operation
     def download(self, remote_path, local_path):
         self.require_connected()
         try:
@@ -41,6 +45,7 @@ class FTPTransport(Transport):
             raise TransportError("FTP download failed; local file may be partial") from exc
         return Path(local_path)
 
+    @log_operation
     def upload(self, local_path, remote_path):
         self.require_connected()
         try:

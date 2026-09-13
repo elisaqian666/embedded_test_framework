@@ -5,6 +5,7 @@ import math
 from typing import Protocol, runtime_checkable
 
 from ..errors import ConfigurationError, TransportError
+from ..logging import get_logger
 
 
 def positive_timeout(value):
@@ -70,6 +71,7 @@ class FileChannel(Protocol):
 class Transport(ABC):
     """One owner per transport. Instances are not generally thread safe."""
     def __init__(self, timeout=5.0):
+        self.logger = get_logger("engine", type(self).__name__)
         self.timeout = positive_timeout(timeout)
         self.connected = False
 

@@ -1,3 +1,4 @@
+from ..logging import log_operation
 from .base import CommandResult, Transport
 from ..errors import TransportError
 
@@ -9,13 +10,16 @@ class MemoryTransport(Transport):
         self.responses = dict(responses or {})
         self.history = []
 
+    @log_operation
     def connect(self):
         self.connected = True
         return self
 
+    @log_operation
     def close(self):
         self.connected = False
 
+    @log_operation
     def execute(self, command, *, timeout=None):
         self.require_connected()
         self.operation_timeout(timeout)
