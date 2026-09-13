@@ -1,0 +1,11 @@
+{
+  "devices": {
+    "dut": {
+      "type": "generic",
+      "metadata": {"model": "offline-demo"},
+      "channels": {
+        "shell": {"type": "memory", "responses": {"cat /etc/os-release": "VERSION_ID=1.0"}}
+      }
+    }
+  }
+}

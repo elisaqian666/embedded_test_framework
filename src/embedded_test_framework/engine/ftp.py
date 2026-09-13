@@ -1,0 +1,50 @@
+from ftplib import FTP
+from pathlib import Path
+
+from .base import Transport
+from ..errors import TransportError
+
+
+class FTPTransport(Transport):
+    def __init__(self, host, *, port=21, username="anonymous", password="anonymous@", timeout=30.0):
+        super().__init__(timeout)
+        self.host, self.port = host, port
+        self.username, self.password = username, password
+        self._client = None
+
+    def connect(self):
+        if self.connected:
+            return self
+        client = FTP()
+        try:
+            client.connect(self.host, self.port, timeout=self.timeout)
+            client.login(self.username, self.password)
+        except Exception as exc:
+            client.close()
+            raise TransportError("FTP connection failed") from exc
+        self._client, self.connected = client, True
+        return self
+
+    def close(self):
+        try:
+            if self._client is not None:
+                self._client.close()
+        finally:
+            self._client, self.connected = None, False
+
+    def download(self, remote_path, local_path):
+        self.require_connected()
+        try:
+            with Path(local_path).open("wb") as stream:
+                self._client.retrbinary("RETR " + remote_path, stream.write)
+        except Exception as exc:
+            raise TransportError("FTP download failed; local file may be partial") from exc
+        return Path(local_path)
+
+    def upload(self, local_path, remote_path):
+        self.require_connected()
+        try:
+            with Path(local_path).open("rb") as stream:
+                self._client.storbinary("STOR " + remote_path, stream)
+        except Exception as exc:
+            raise TransportError("FTP upload failed; remote file may be partial") from exc
