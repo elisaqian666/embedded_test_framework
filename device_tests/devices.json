@@ -1,14 +1,29 @@
 {
   "logging": {
     "level": "info",
-    "levels": {"engine": "info", "server": "info", "dut": "info", "host": "warning"}
+    "levels": {
+      "engine": "info", 
+      "server": "info", 
+      "dut": "info", 
+      "host": "warning"
+    }
   },
   "devices": {
     "linux-board": {
       "type": "generic",
-      "metadata": {"address": "192.168.1.101", "username": "root", "platform": "Linux"},
+      "metadata": {
+        "address": "192.168.1.101", 
+        "username": "root", 
+        "platform": "Linux"
+      },
       "channels": {
-        "shell": {"type": "ssh", "host": "192.168.1.101", "username": "root", "password": "${DUT_SSH_PASSWORD}", "timeout": 10}
+        "shell": {
+          "type": "ssh", 
+          "host": "192.168.1.101", 
+          "username": "root", 
+          "password": "${DUT_SSH_PASSWORD}", 
+          "timeout": 10
+        }
       }
     }
   }
