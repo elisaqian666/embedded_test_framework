@@ -10,7 +10,8 @@ import time
 
 from .host_base import Host, Peripheral, ProcessInfo
 from ..errors import CapabilityError, CleanupError, ConfigurationError, OperationTimeout, TransportError
-from ..engine.transport_base import CommandResult, positive_timeout
+from ..core.contracts import CommandResult
+from ..core.validation import positive_timeout
 
 
 def _arguments(args):

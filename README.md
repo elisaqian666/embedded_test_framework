@@ -2,6 +2,23 @@
 
 A Python SDK for independent test repositories, requiring Python 3.11+. The framework manages communication, device lifecycles, and reusable services. Product expectations, assertions, and test reports belong in the consuming test repository.
 
+The PDF-based refactor adds a configuration-driven `TestContext`, device capabilities,
+lab helper contracts, polling/stability observations, evidence collection, and multi-device
+test lifecycles while preserving existing APIs. See the [Chinese architecture and migration guide](docs/architecture.md)
+and the [standalone runtime example](examples/runtime_tests/README.md).
+
+```python
+from embedded_test_framework import TestContext
+
+with TestContext.from_file("runtime.json") as ctx:
+    addresses = ctx.services["network"].get_ipv4_addresses("eth0")
+    print(addresses)
+```
+
+Use `configs/runtime.example.json` as a starting configuration. Platform commands and
+parsing live in device adapters; portable services access registered device capabilities.
+`Registry` supports external transport, device, host, capability, helper, and service factories.
+
 ## Architecture and directories
 
 ```text
@@ -17,19 +34,28 @@ engine: CommandChannel / RequestChannel / ByteChannel / FileChannel
 SSH / ADB / HTTP / Serial / FTP / Memory / custom drivers
 
 src/embedded_test_framework/
+  core/              Shared contracts, runtime context, resource ownership, validation
   engine/            Communication implementations, capabilities, result types
   devices/           Device objects independent of test runners
+  capabilities/      Device capability contracts
+  adapters/          Platform implementations behind device APIs
   hosts/             Host operations, application lifecycles, process/peripheral inventory
   services/          Reusable application workflows
+  lab/               External instrument/helper contracts
+  wait/              Polling and stability observations
+  diagnostics/       Evidence and performance collection
+  testing/           Single-device and multi-device test lifecycles
   config.py          Configuration loading, device factory, extension registry
   errors.py          Public exceptions
   pytest_plugin.py   Optional pytest integration
 configs/             Real-device configuration templates
 examples/external_tests/  Offline examples to copy into a separate repository
+examples/runtime_tests/   Context and consumer-owned capability adapters
+docs/                Architecture and migration documentation
 unittest/            Framework tests
 ```
 
-The core package uses only the standard library. Install pyserial when serial communication is needed. SSH uses system OpenSSH by default, and ADB uses Android platform tools. HTTP `connect()` only establishes logical state; requests or health services verify reachability. OpenSSH authentication is checked by executing `true`, and the host key must already be in known_hosts. Key/agent authentication is the default; passing `password` uses an optional Paramiko session (install `[ssh]`). The SSH command interface targets POSIX shells.
+The core package uses only the standard library. Install pyserial when serial communication is needed. SSH uses system OpenSSH by default, and ADB uses Android platform tools. HTTP `connect()` only establishes logical state; requests or health services verify reachability. OpenSSH authentication is checked by executing `true`, and the host key must already be in known_hosts. Key/agent authentication is the default; passing `password` uses an optional Paramiko session (install `[ssh]`), preserving the current workspace's AutoAddPolicy for unknown host keys. The SSH command interface targets POSIX shells.
 
 ## Installation and use from a separate repository
 

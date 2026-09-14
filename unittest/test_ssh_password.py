@@ -16,7 +16,7 @@ def test_password_session_executes_and_closes(monkeypatch):
     channel.exit_status_ready.return_value = True
     channel.recv.return_value = b"6.6.1\n"
     channel.recv_exit_status.return_value = 0
-    monkeypatch.setitem(sys.modules, "paramiko", SimpleNamespace(SSHClient=lambda: client, RejectPolicy=Mock()))
+    monkeypatch.setitem(sys.modules, "paramiko", SimpleNamespace(SSHClient=lambda: client, RejectPolicy=Mock(), AutoAddPolicy=Mock()))
     with SSHTransport("192.168.1.103", password="test-secret") as engine:
         result = engine.execute("uname -r")
         assert result.ok and result.stdout == "6.6.1\n"
@@ -30,7 +30,7 @@ def test_password_session_executes_and_closes(monkeypatch):
 def test_password_failure_does_not_fall_back(monkeypatch):
     client = Mock()
     client.connect.side_effect = RuntimeError("authentication failed")
-    monkeypatch.setitem(sys.modules, "paramiko", SimpleNamespace(SSHClient=lambda: client, RejectPolicy=Mock()))
+    monkeypatch.setitem(sys.modules, "paramiko", SimpleNamespace(SSHClient=lambda: client, RejectPolicy=Mock(), AutoAddPolicy=Mock()))
     engine = SSHTransport("192.168.1.103", password="test-secret")
     engine._run = Mock()
     with pytest.raises(TransportError):

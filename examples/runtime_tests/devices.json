@@ -1,0 +1,37 @@
+{
+  "devices": {
+    "dut": {
+      "type": "linux",
+      "channels": {
+        "shell": {
+          "type": "memory",
+          "responses": {
+            "ifconfig eth0": "eth0: flags=4163<UP>\n    inet 192.0.2.10 netmask 255.255.255.0\n",
+            "read-test-logs": "Offline DUT log\n",
+            "read-test-metrics": "{\"memory_bytes\": 4096, \"temperature_c\": 40}"
+          }
+        }
+      },
+      "capabilities": {
+        "logging": {"type": "example-logs"},
+        "performance": {"type": "example-metrics"}
+      }
+    },
+    "peer": {
+      "channels": {
+        "shell": {
+          "type": "memory",
+          "responses": {"network status --json": "{\"eth0\": [\"192.0.2.11\"]}"}
+        }
+      },
+      "capabilities": {"network": {"type": "example-json-network"}}
+    }
+  },
+  "helpers": {"lab": {"type": "example-lab"}},
+  "services": {
+    "dut_network": {"type": "network", "device": "dut"},
+    "peer_network": {"type": "network", "device": "peer"}
+  },
+  "inputs": {"firmware": "example-only.bin"},
+  "artifacts": "reports/runtime-example"
+}

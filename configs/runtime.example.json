@@ -1,0 +1,14 @@
+{
+  "devices": {
+    "dut": {
+      "type": "linux",
+      "channels": {"shell": {"type": "ssh", "host": "${DUT_HOST}", "username": "root"}},
+      "capabilities": {"network": {"type": "linux-network", "command": "ifconfig", "channel": "shell"}}
+    }
+  },
+  "helpers": {},
+  "services": {"network": {"type": "network", "device": "dut"}},
+  "inputs": {},
+  "artifacts": "reports/artifacts",
+  "logging": {"level": "info"}
+}

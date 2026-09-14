@@ -1,8 +1,8 @@
 from .transport_base import Transport, CommandChannel, RequestChannel, ByteChannel, FileChannel, CommandResult, HttpResponse
-from .http import HttpTransport
-from .command import SSHTransport, ADBTransport
-from .serial import SerialTransport
-from .ftp import FTPTransport
+from .he_http import HttpTransport
+from .he_commands import SSHTransport, ADBTransport
+from .he_serial import SerialTransport
+from .he_ftp import FTPTransport
 from .memory import MemoryTransport
 
 __all__ = ["Transport", "CommandChannel", "RequestChannel", "ByteChannel", "FileChannel",

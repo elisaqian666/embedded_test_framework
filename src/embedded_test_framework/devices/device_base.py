@@ -1,8 +1,9 @@
 from ..logging import get_logger, log_operation
 """Device composition independent of pytest/unittest and product assertions."""
 
-from ..errors import CapabilityError, CleanupError, ConfigurationError, TransportError
-from ..engine import CommandChannel, RequestChannel, ByteChannel, FileChannel
+from types import MappingProxyType
+from ..errors import CapabilityError, CleanupError, ConfigurationError, TransportError, DeviceDisconnected
+from ..core.contracts import CommandChannel, RequestChannel, ByteChannel, FileChannel
 
 
 class Device:
@@ -16,6 +17,7 @@ class Device:
         self.host = host if host is not None else LocalHost()
         self._owns_host = host is None
         self._channels = dict(channels)
+        self._capabilities = {}
         self.metadata = dict(metadata or {})
         self.connected = False
         self.logger = get_logger("dut", name)
@@ -63,13 +65,72 @@ class Device:
 
     def channel(self, name, capability=None):
         if not self.connected:
-            raise TransportError("Device is not connected")
+            raise DeviceDisconnected("Device is not connected")
         if name not in self._channels:
             raise CapabilityError(f"Device {self.name!r} has no channel {name!r}")
         transport = self._channels[name]
         if capability is not None and not isinstance(transport, capability):
             raise CapabilityError(f"Channel {name!r} does not implement {capability.__name__}")
         return transport
+
+    @property
+    def capabilities(self):
+        return MappingProxyType(self._capabilities)
+
+    @property
+    def channel_names(self):
+        return tuple(self._channels)
+
+    def bind_capability(self, name, capability, *, replace=False):
+        from ..capabilities import Capability
+        if not isinstance(name, str) or not name or (name in self._capabilities and not replace):
+            raise ConfigurationError("Capability requires a unique nonempty name")
+        if not isinstance(capability, Capability) or capability.device is not self:
+            raise ConfigurationError("Capability must belong to this device")
+        self._capabilities[name] = capability
+        return capability
+
+    def capability(self, name, contract=None):
+        if name not in self._capabilities:
+            raise CapabilityError(f"Device {self.name!r} has no capability {name!r}")
+        capability = self._capabilities[name]
+        if contract is not None and not isinstance(capability, contract):
+            raise CapabilityError(f"Capability {name!r} does not implement the requested contract")
+        return capability
+
+    def prepare(self):
+        return self.connect()
+
+    def cleanup(self):
+        return self.close()
+
+    @log_operation
+    def reconnect(self):
+        """Explicit recovery; commands are never replayed automatically."""
+        self.close()
+        return self.connect()
+
+    def reboot(self):
+        return self.capability("power").reboot()
+
+    def flash(self, image):
+        return self.capability("update").flash(image)
+
+    def collect_logs(self, destination):
+        return self.capability("logging").collect_logs(destination)
+
+    def health_check(self):
+        return self.capability("health").health_check()
+
+    def detect_crash(self):
+        return self.capability("crash").detect_crash()
+
+    def get_ipv4_addresses(self, interface="eth0", *, channel="shell", command="ifconfig",
+                           include_loopback=False, timeout=None):
+        """Legacy shell query. New portable clients use the network capability."""
+        from ..adapters.linux import LinuxNetworkCapability
+        return LinuxNetworkCapability(self, channel=channel).get_ipv4_addresses(
+            interface, command=command, include_loopback=include_loopback, timeout=timeout)
 
     def execute(self, command, *, channel="shell", timeout=None):
         return self.channel(channel, CommandChannel).execute(command, timeout=timeout)

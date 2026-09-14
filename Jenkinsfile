@@ -55,6 +55,18 @@ pipeline {
             }
             post { always { junit testResults: 'reports/examples.xml', allowEmptyResults: false } }
         }
+        stage('Runtime examples') {
+            steps {
+                script {
+                    if (isUnix()) {
+                        sh '.venv/bin/python -m pytest examples/runtime_tests --device-config examples/runtime_tests/devices.json --junitxml=reports/runtime-examples.xml'
+                    } else {
+                        bat '.venv\\Scripts\\python.exe -m pytest examples/runtime_tests --device-config examples/runtime_tests/devices.json --junitxml=reports/runtime-examples.xml'
+                    }
+                }
+            }
+            post { always { junit testResults: 'reports/runtime-examples.xml', allowEmptyResults: false } }
+        }
         stage('Build wheel') {
             steps {
                 script {

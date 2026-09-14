@@ -5,9 +5,13 @@ from .logging import configure_logging, load_logging_config, get_logger
 from .hosts import Host, LocalHost, Peripheral, ProcessInfo, Application
 from .errors import FrameworkError, ConfigurationError, TransportError, OperationTimeout, CapabilityError, CleanupError
 from .engine import CommandResult, HttpResponse
+from .core.context import TestContext, RuntimeConfig
+from .core.lifecycle import ResourceRegistry
+from .errors import DeviceDisconnected, CommandFailed, ObservationFailed
 
 __version__ = "0.2.0"
 __all__ = ["Device", "DeviceFactory", "Registry", "load_device", "CommandResult", "HttpResponse",
+           "TestContext", "RuntimeConfig", "ResourceRegistry", "DeviceDisconnected", "CommandFailed", "ObservationFailed",
            "configure_logging", "load_logging_config", "get_logger",
            "FrameworkError", "ConfigurationError", "TransportError", "OperationTimeout", "CapabilityError", "CleanupError",
            "Host", "LocalHost", "Peripheral", "ProcessInfo", "Application"]

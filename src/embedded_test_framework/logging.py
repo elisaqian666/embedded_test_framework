@@ -80,7 +80,8 @@ def log_operation(method):
         try:
             result = method(self, *args, **kwargs)
         except Exception as exc:
-            self.logger.error("%s failed (%s)", method.__name__, type(exc).__name__)
+            self.logger.error("%s failed (%s, code=%s)", method.__name__, type(exc).__name__,
+                              getattr(exc, "code", "UNEXPECTED_ERROR"))
             raise
         if getattr(result, "ok", None) is False:
             self.logger.warning("%s completed with an unsuccessful result", method.__name__)

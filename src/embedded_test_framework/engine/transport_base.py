@@ -1,71 +1,9 @@
-"""Lifecycle and independent capabilities for protocol implementations."""
+"""Communication lifecycle; legacy contract imports remain supported."""
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-import math
-from typing import Protocol, runtime_checkable
-
-from ..errors import ConfigurationError, TransportError
-from ..logging import get_logger
-
-
-def positive_timeout(value):
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
-        raise ConfigurationError("timeout must be a finite positive number")
-    return float(value)
-
-
-@dataclass(frozen=True)
-class CommandResult:
-    command: str
-    stdout: str = ""
-    stderr: str = ""
-    exit_code: int = 0
-    duration: float = 0.0
-
-    @property
-    def ok(self):
-        return self.exit_code == 0
-
-    def check(self):
-        if not self.ok:
-            raise TransportError(f"Command exited with status {self.exit_code}")
-        return self
-
-
-@dataclass(frozen=True)
-class HttpResponse:
-    status_code: int
-    headers: dict[str, str]
-    body: bytes
-
-    @property
-    def ok(self):
-        return 200 <= self.status_code < 300
-
-    def json(self):
-        import json
-        return json.loads(self.body)
-
-
-@runtime_checkable
-class CommandChannel(Protocol):
-    def execute(self, command: str, *, timeout=None) -> CommandResult: ...
-
-
-@runtime_checkable
-class RequestChannel(Protocol):
-    def request(self, method: str, path: str, *, payload=None, params=None, headers=None, timeout=None) -> HttpResponse: ...
-
-
-@runtime_checkable
-class ByteChannel(Protocol):
-    def exchange(self, data: bytes, *, delimiter: bytes = b"\n", timeout=None) -> bytes: ...
-
-
-@runtime_checkable
-class FileChannel(Protocol):
-    def upload(self, local_path, remote_path): ...
-    def download(self, remote_path, local_path): ...
+from ..core.contracts import CommandResult, HttpResponse, CommandChannel, RequestChannel, ByteChannel, FileChannel
+from ..core.validation import positive_timeout
+from ..errors import DeviceDisconnected
+from ..logging import get_logger, log_operation
 
 
 class Transport(ABC):
@@ -77,10 +15,19 @@ class Transport(ABC):
 
     def require_connected(self):
         if not self.connected:
-            raise TransportError("Transport is not connected")
+            raise DeviceDisconnected("Transport is not connected")
 
     def operation_timeout(self, timeout):
         return self.timeout if timeout is None else positive_timeout(timeout)
+
+    def disconnect(self):
+        return self.close()
+
+    @log_operation
+    def reconnect(self):
+        """Recover a connection explicitly without replaying any operation."""
+        self.close()
+        return self.connect()
 
     @abstractmethod
     def connect(self): ...

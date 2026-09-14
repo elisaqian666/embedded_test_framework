@@ -2,12 +2,19 @@ from unittest.mock import Mock
 
 import pytest
 
-from embedded_test_framework import CommandResult, ConfigurationError, OperationTimeout, TransportError
+from embedded_test_framework import Device, CommandResult, ConfigurationError, OperationTimeout, TransportError
 from embedded_test_framework.services import SSHShellService
 
 
-def test_execute_routes_command_and_preserves_result():
+def mock_device():
+    from types import MethodType
     device = Mock()
+    device.get_ipv4_addresses = MethodType(Device.get_ipv4_addresses, device)
+    return device
+
+
+def test_execute_routes_command_and_preserves_result():
+    device = mock_device()
     result = device.execute.return_value = CommandResult("uname -r", stdout="6.6\n")
     assert SSHShellService(device, channel="ssh").execute("uname -r", timeout=2) is result
     device.execute.assert_called_once_with("uname -r", channel="ssh", timeout=2)
@@ -24,7 +31,7 @@ def test_execute_routes_command_and_preserves_result():
     ("ifconfig", "", []),
 ])
 def test_ipv4_formats(command, output, expected):
-    device = Mock()
+    device = mock_device()
     device.execute.return_value = CommandResult(command, stdout=output)
     assert SSHShellService(device).get_ipv4_addresses(command=command, timeout=3) == expected
     expected_command = command + (" dev eth0" if command == "ip -4 addr" else " eth0")
@@ -32,7 +39,7 @@ def test_ipv4_formats(command, output, expected):
 
 
 def test_include_loopback():
-    device = Mock()
+    device = mock_device()
     device.execute.return_value = CommandResult("ifconfig", stdout="inet addr:127.0.0.1\n")
     assert SSHShellService(device).get_ipv4_addresses("lo", include_loopback=True) == ["127.0.0.1"]
 
@@ -45,7 +52,7 @@ def test_include_loopback():
     (None, "ip -4 addr", "ip -4 addr"),
 ])
 def test_interface_selection(interface, command, expected):
-    device = Mock()
+    device = mock_device()
     device.execute.return_value = CommandResult(expected, stdout="inet 10.0.0.2\n")
     assert SSHShellService(device).get_ipv4_addresses(interface, command=command) == ["10.0.0.2"]
     device.execute.assert_called_once_with(expected, channel="shell", timeout=None)
@@ -53,14 +60,14 @@ def test_interface_selection(interface, command, expected):
 
 @pytest.mark.parametrize("interface", ["", "-a", "eth0; reboot", "eth0 wlan0", 123])
 def test_invalid_interface_is_rejected(interface):
-    device = Mock()
+    device = mock_device()
     with pytest.raises(ConfigurationError):
         SSHShellService(device).get_ipv4_addresses(interface)
     device.execute.assert_not_called()
 
 
 def test_command_failure_and_timeout_are_not_empty_address_lists():
-    device = Mock()
+    device = mock_device()
     device.execute.return_value = CommandResult("ifconfig", stderr="not found", exit_code=127)
     with pytest.raises(TransportError):
         SSHShellService(device).get_ipv4_addresses()

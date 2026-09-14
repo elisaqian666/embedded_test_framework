@@ -7,3 +7,4 @@ dist/
 *.egg-info/
 devices.local.json
 reports/
+tmp/

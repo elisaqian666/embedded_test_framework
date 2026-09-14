@@ -16,6 +16,31 @@ class Registry:
         self.transports = {}
         self.devices = {}
         self.hosts = {}
+        self.capabilities = {}
+        self.helpers = {}
+        self.services = {}
+
+    def register_capability(self, name, factory):
+        self._register(self.capabilities, name, factory)
+
+    def register_helper(self, name, factory):
+        self._register(self.helpers, name, factory)
+
+    def register_service(self, name, factory):
+        self._register(self.services, name, factory)
+
+    def load_plugins(self, names):
+        """Explicitly load trusted installed entry points; configuration never imports code."""
+        from importlib.metadata import entry_points
+        if not isinstance(names, (list, tuple)) or any(not isinstance(name, str) or not name for name in names):
+            raise ConfigurationError("Plugin names must be a list or tuple of nonempty strings")
+        available = list(entry_points(group="embedded_test_framework.plugins"))
+        for name in names:
+            matches = [entry for entry in available if entry.name == name]
+            if len(matches) != 1:
+                raise ConfigurationError(f"Plugin {name!r} must identify exactly one installed entry point")
+            matches[0].load()(self)
+        return self
 
     def register_host(self, name, factory):
         self._register(self.hosts, name, factory)
@@ -40,6 +65,13 @@ class Registry:
             registry.register_transport(name, factory)
         registry.register_device("generic", Device)
         registry.register_host("local", LocalHost)
+        from .adapters.linux import LinuxDevice, LinuxNetworkCapability
+        from .services import NetworkService, SystemService, HealthService, FileService, SSHShellService, DeviceService
+        registry.register_device("linux", LinuxDevice)
+        registry.register_capability("linux-network", LinuxNetworkCapability)
+        for name, factory in {"network": NetworkService, "system": SystemService, "health": HealthService,
+                              "files": FileService, "ssh-shell": SSHShellService, "device": DeviceService}.items():
+            registry.register_service(name, factory)
         return registry
 
 
@@ -63,7 +95,7 @@ class DeviceFactory:
         self.registry = registry if registry is not None else Registry.defaults()
 
     def create(self, name, spec):
-        if not isinstance(spec, dict) or set(spec) - {"type", "channels", "metadata", "host"}:
+        if not isinstance(spec, dict) or set(spec) - {"type", "channels", "metadata", "host", "capabilities"}:
             raise ConfigurationError("Invalid device specification fields")
         specs = spec.get("channels")
         if not isinstance(specs, dict) or not specs:
@@ -91,7 +123,8 @@ class DeviceFactory:
             channels[channel] = transport
         host_spec = spec.get("host")
         if host_spec is None:
-            return self.registry.devices[kind](name, channels, metadata=_resolve(metadata))
+            device = self.registry.devices[kind](name, channels, metadata=_resolve(metadata))
+            return self._attach_capabilities(device, spec.get("capabilities", {}))
         if not isinstance(host_spec, dict):
             raise ConfigurationError("host must be an object")
         host_type = host_spec.get("type", "local")
@@ -105,6 +138,24 @@ class DeviceFactory:
             raise ConfigurationError("Host factories must return Host instances")
         device = self.registry.devices[kind](name, channels, metadata=_resolve(metadata), host=host)
         device._owns_host = True
+        return self._attach_capabilities(device, spec.get("capabilities", {}))
+
+    def _attach_capabilities(self, device, specs):
+        if not isinstance(device, Device):
+            raise ConfigurationError("Device factories must return Device instances")
+        if not isinstance(specs, dict):
+            raise ConfigurationError("capabilities must be an object")
+        for name, options in specs.items():
+            if not isinstance(options, dict) or not isinstance(options.get("type"), str):
+                raise ConfigurationError("Capability specification requires a type")
+            factory = self.registry.capabilities.get(options["type"])
+            if factory is None:
+                raise ConfigurationError(f"Unknown capability type for {name!r}")
+            try:
+                capability = factory(device, **_resolve({k: v for k, v in options.items() if k != "type"}))
+            except (TypeError, ValueError) as exc:
+                raise ConfigurationError(f"Invalid capability options for {name!r}") from exc
+            device.bind_capability(name, capability, replace=True)
         return device
 
 
