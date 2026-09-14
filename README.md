@@ -78,6 +78,46 @@ pytest --device-config devices.json --device-name dut
 
 The fixture connects and releases resources for each test. Relative configuration paths are resolved against pytest's rootdir. Enable the plugin explicitly; it does not automatically affect other test projects. Copy `examples/external_tests` into a separate repository to run the examples. MemoryTransport requires no hardware.
 
+## SSH shell service: commands and IP addresses
+
+`SSHShellService` uses a connected device's `shell` channel (configurable via
+`channel=`). Set up that channel with `SSHTransport`:
+
+```python
+from embedded_test_framework import Device
+from embedded_test_framework.engine import SSHTransport
+from embedded_test_framework.services import SSHShellService
+
+with Device("linux-board", {
+    "shell": SSHTransport("192.168.1.103", username="root"),
+}) as device:
+    ssh = SSHShellService(device)
+    result = ssh.execute("ifconfig", timeout=5)
+    print(result.check().stdout)
+    print(ssh.execute("uname -r").check().stdout.strip())
+    print(ssh.get_ipv4_addresses())  # eth0 by default; example: ['192.168.1.103']
+    # If the board has ip instead of ifconfig:
+    print(ssh.get_ipv4_addresses("eth0", command="ip -4 addr"))
+    # Limit discovery to one interface:
+    print(ssh.get_ipv4_addresses("eth1"))
+    print(ssh.get_ipv4_addresses("wlan0"))
+    print(ssh.get_ipv4_addresses(None))  # All interfaces
+```
+
+The SSH host must already be reachable by a known IP or hostname; this service
+reads interface addresses after login, rather than scanning for unknown devices.
+The example uses existing OpenSSH key/agent authentication and known_hosts.
+For password authentication, install `embedded-test-framework[ssh]` and pass
+`password=` to `SSHTransport`.
+
+`execute()` returns `CommandResult` including stdout, stderr, and exit code.
+`get_ipv4_addresses(interface="eth0")` queries the selected interface and checks
+command success. Pass `None` to query all interfaces. It supports Linux/BusyBox ifconfig
+and `ip -4 addr` output, and returns unique IPv4 addresses in output order.
+It excludes unspecified and (by default) loopback addresses; pass
+`include_loopback=True` to include loopback. No matching addresses returns `[]`;
+command failures and timeouts raise exceptions. Device owns connection cleanup.
+
 ## Host layer: applications, processes, and peripherals
 
 `Device.host` defaults to the local machine running Python and can be used before `device.connect()`. The host layer manages the test environment while the communication layer exchanges data with the board. The configured `host.name` is a label, not a remote address.

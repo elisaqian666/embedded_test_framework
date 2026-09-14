@@ -2,6 +2,7 @@ from ..logging import get_logger, log_operation
 """Reusable workflows. Product commands and expected values belong to consumers."""
 import time
 from .host import HostService
+from .ssh_shell import SSHShellService
 
 from ..errors import OperationTimeout, TransportError
 from ..engine.transport_base import positive_timeout
@@ -58,4 +59,4 @@ class FileService:
         return self.device.upload(local_path, remote_path, channel=self.channel)
 
 
-__all__ = ["SystemService", "HealthService", "FileService", "HostService"]
+__all__ = ["SystemService", "HealthService", "FileService", "HostService", "SSHShellService"]
