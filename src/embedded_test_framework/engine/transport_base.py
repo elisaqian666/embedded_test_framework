@@ -1,9 +1,9 @@
 """Communication lifecycle; legacy contract imports remain supported."""
 from abc import ABC, abstractmethod
-from ..core.contracts import CommandResult, HttpResponse, CommandChannel, RequestChannel, ByteChannel, FileChannel
-from ..core.validation import positive_timeout
-from ..errors import DeviceDisconnected
-from ..logging import get_logger, log_operation
+from ..libs.contracts import CommandResult, HttpResponse, CommandChannel, RequestChannel, ByteChannel, FileChannel
+from ..libs.validation import positive_timeout
+from ..libs.errors import DeviceDisconnected
+from ..libs.logging import get_logger, log_operation
 
 
 class Transport(ABC):

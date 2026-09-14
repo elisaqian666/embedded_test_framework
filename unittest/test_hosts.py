@@ -6,7 +6,7 @@ import pytest
 
 from embedded_test_framework import Device, DeviceFactory, LocalHost, Peripheral, ConfigurationError, OperationTimeout
 from embedded_test_framework.hosts import ProcessInfo
-from embedded_test_framework.services import HostService
+from embedded_test_framework.dut.services import HostService
 from embedded_test_framework.engine import MemoryTransport
 
 

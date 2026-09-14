@@ -13,13 +13,15 @@ def test_lifecycle_in_pytest(pytester):
     }}}), encoding="utf-8")
     pytester.makepyfile('''
 from pathlib import Path
-from embedded_test_framework.testing import DeviceTestBase
+from embedded_test_framework.dut import DeviceTestBase
 events = []
 class TestBoard(DeviceTestBase):
     config_path = Path(__file__).with_name("devices.json")
     @classmethod
     def setupclass(cls):
         assert not cls.device.connected
+        assert cls.cut.device is cls.device
+        assert cls.cut.engines.shell is cls.device.engines["shell"]
         events.append("class setup")
     def setup(self):
         assert self.device.connected
@@ -33,6 +35,7 @@ class TestBoard(DeviceTestBase):
         events.append("class teardown")
     def test_first(self):
         assert self.device.execute("version").stdout == "1.0"
+        assert self.cut.engines.shell.execute("version").stdout == "1.0"
     def test_second(self):
         assert self.device.connected
 def test_order():
@@ -43,7 +46,7 @@ def test_order():
 
 @pytest.mark.parametrize("hook", ["setupclass", "setup", "teardown", "teardownclass"])
 def test_hook_failure_releases_device(tmp_path, hook):
-    from embedded_test_framework.testing import DeviceTestBase
+    from embedded_test_framework.dut import DeviceTestBase
     path = tmp_path / "devices.json"
     path.write_text(json.dumps({"devices": {"dut": {"channels": {"shell": {"type": "memory"}}}}}), encoding="utf-8")
     class Board(DeviceTestBase):

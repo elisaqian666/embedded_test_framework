@@ -11,7 +11,7 @@ def test_failed_test_collects_evidence_while_connected_and_cleans_up(pytester):
 import pytest
 from pathlib import Path
 from embedded_test_framework import Registry
-from embedded_test_framework.capabilities import LoggingCapability
+from embedded_test_framework.dut.device_features import LoggingCapability
 pytest_plugins = ["embedded_test_framework.pytest_plugin"]
 class Logs(LoggingCapability):
     def collect_logs(self, destination):
@@ -47,7 +47,7 @@ def test_embedded_test_case_multi_device_lifecycle(pytester):
     (pytester.path / "devices.json").write_text(json.dumps({"devices": {"dut": spec, "peer": spec}}))
     pytester.makepyfile('''
 from pathlib import Path
-from embedded_test_framework.testing import EmbeddedTestCase
+from embedded_test_framework.dut import EmbeddedTestCase
 saved = []
 class TestBoard(EmbeddedTestCase):
     config_path = Path(__file__).with_name("devices.json")

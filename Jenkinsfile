@@ -76,6 +76,17 @@ pipeline {
                         bat '.venv\\Scripts\\python.exe -m pip wheel . --no-deps -w dist'
                     }
                 }
+            }
+        }
+        stage('Verify wheel') {
+            steps {
+                script {
+                    if (isUnix()) {
+                        sh '.venv/bin/python -I unittest/verify_distribution.py dist/embedded_test_framework-0.3.0-py3-none-any.whl'
+                    } else {
+                        bat '.venv\\Scripts\\python.exe -I unittest/verify_distribution.py dist/embedded_test_framework-0.3.0-py3-none-any.whl'
+                    }
+                }
                 archiveArtifacts artifacts: 'dist/*.whl', fingerprint: true
             }
         }

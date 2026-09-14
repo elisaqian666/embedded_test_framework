@@ -3,8 +3,8 @@ import json
 import pytest
 
 from embedded_test_framework import Device, TransportError
-from embedded_test_framework.capabilities import LoggingCapability, CrashCapability, PerformanceCapability
-from embedded_test_framework.diagnostics import EvidenceCollector, PerformanceMonitor
+from embedded_test_framework.dut.device_features import LoggingCapability, CrashCapability, PerformanceCapability
+from embedded_test_framework.helpers.evidence import EvidenceCollector, PerformanceMonitor
 from embedded_test_framework.engine import MemoryTransport
 
 
@@ -30,7 +30,7 @@ def test_evidence_continues_after_source_failure(tmp_path):
 
 
 def test_performance_records_samples_and_trend(tmp_path, monkeypatch):
-    from embedded_test_framework import diagnostics
+    from embedded_test_framework.helpers import evidence as diagnostics
     now = [0]
     monkeypatch.setattr(diagnostics.time, "monotonic", lambda: now[0])
     monkeypatch.setattr(diagnostics.time, "sleep", lambda delay: now.__setitem__(0, now[0] + delay))

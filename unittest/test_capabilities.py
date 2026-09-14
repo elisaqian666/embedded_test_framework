@@ -1,9 +1,9 @@
 import pytest
 
 from embedded_test_framework import Device, Registry, DeviceFactory, CapabilityError, ConfigurationError, CommandFailed
-from embedded_test_framework.capabilities import NetworkCapability
+from embedded_test_framework.dut.device_features import NetworkCapability
 from embedded_test_framework.engine import MemoryTransport, CommandResult
-from embedded_test_framework.services import NetworkService, SSHShellService
+from embedded_test_framework.dut.services import NetworkService, SSHShellService
 
 
 class JsonNetwork(NetworkCapability):

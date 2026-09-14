@@ -2,8 +2,9 @@
 from pathlib import Path
 import json
 import pytest
-
-from .config import Registry, load_device
+from .dut import DeviceTestBase
+from .helpers.evidence import EvidenceCollector
+from .configurators import Registry, load_device
 
 
 def pytest_addoption(parser):
@@ -39,8 +40,8 @@ def runtime_overrides():
 
 @pytest.fixture
 def test_context(request, device_registry, runtime_overrides):
-    from .core.context import TestContext
-    from .errors import ConfigurationError
+    from .configurators.runtime import TestContext
+    from .libs.errors import ConfigurationError
     path = Path(request.config.getoption("--device-config"))
     if not path.is_absolute():
         path = request.config.rootpath / path
@@ -59,11 +60,13 @@ def test_context(request, device_registry, runtime_overrides):
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
+    """
+        After any test cases, if the test failed, collect evidence from the device and attach it to the report.
+    """
     report = (yield).get_result()
     if not report.failed:
         return
-    from .testing import DeviceTestBase
-    from .diagnostics import EvidenceCollector
+    
     context = getattr(item, "_embedded_context", None)
     device = getattr(item, "_embedded_device", None)
     instance = getattr(item, "instance", None)

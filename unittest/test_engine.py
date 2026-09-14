@@ -8,7 +8,7 @@ import urllib.error
 import pytest
 
 from embedded_test_framework.engine import ADBTransport, SSHTransport, FTPTransport, HttpTransport, SerialTransport, MemoryTransport, CommandResult, HttpResponse
-from embedded_test_framework.errors import ConfigurationError, OperationTimeout, TransportError
+from embedded_test_framework.libs.errors import ConfigurationError, OperationTimeout, TransportError
 
 
 def test_results_and_memory_context():

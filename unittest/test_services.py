@@ -1,6 +1,6 @@
 from unittest.mock import Mock, patch
 import pytest
-from embedded_test_framework.services import HealthService, SystemService, FileService
+from embedded_test_framework.dut.services import HealthService, SystemService, FileService
 from embedded_test_framework import OperationTimeout, TransportError, CommandResult
 
 

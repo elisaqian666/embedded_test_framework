@@ -1,10 +1,10 @@
-from ..logging import log_operation
+from ..libs.logging import log_operation
 """Command transports backed by installed OpenSSH and Android platform tools."""
 import subprocess
 import time
 
 from .transport_base import CommandResult, Transport
-from ..errors import ConfigurationError, OperationTimeout, TransportError, DeviceDisconnected
+from ..libs.errors import ConfigurationError, OperationTimeout, TransportError, DeviceDisconnected
 
 
 class ProcessTransport(Transport):
@@ -121,9 +121,11 @@ class SSHTransport(ProcessTransport):
 
 
 class ADBTransport(ProcessTransport):
-    def __init__(self, device=None, *, timeout=30.0):
+    def __init__(self, device=None, *, executable="adb", timeout=30.0):
         super().__init__(timeout)
-        self.args = ["adb"] + (["-s", device] if device else [])
+        if not isinstance(executable, str) or not executable:
+            raise ConfigurationError("ADB executable must be a nonempty path or command")
+        self.args = [executable] + (["-s", device] if device else [])
 
     @log_operation
     def connect(self):

@@ -1,4 +1,4 @@
-from ..logging import get_logger, log_operation
+from ..libs.logging import get_logger, log_operation
 """The machine running Python; no implicit execution on remote hosts."""
 import json
 import os
@@ -9,9 +9,9 @@ import subprocess
 import time
 
 from .host_base import Host, Peripheral, ProcessInfo
-from ..errors import CapabilityError, CleanupError, ConfigurationError, OperationTimeout, TransportError
-from ..core.contracts import CommandResult
-from ..core.validation import positive_timeout
+from ..libs.errors import CapabilityError, CleanupError, ConfigurationError, OperationTimeout, TransportError
+from ..libs.contracts import CommandResult
+from ..libs.validation import positive_timeout
 
 
 def _arguments(args):

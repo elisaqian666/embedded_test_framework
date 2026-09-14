@@ -7,12 +7,12 @@ import pytest
 
 from embedded_test_framework import Device, configure_logging, get_logger, load_device, load_logging_config, ConfigurationError
 from embedded_test_framework.engine import MemoryTransport, CommandResult
-from embedded_test_framework.services import SystemService
+from embedded_test_framework.dut.services import SystemService
 
 
 @pytest.fixture(autouse=True)
 def restore_logging():
-    module = importlib.import_module("embedded_test_framework.logging")
+    module = importlib.import_module("embedded_test_framework.libs.logging")
     loggers = [logging.getLogger("embedded_test_framework")] + [get_logger(c) for c in ("engine", "server", "dut", "host")]
     states = [(l, l.level, l.propagate, l.handlers[:]) for l in loggers]
     previous = module._handler

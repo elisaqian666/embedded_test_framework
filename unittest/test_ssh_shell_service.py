@@ -3,7 +3,7 @@ from unittest.mock import Mock
 import pytest
 
 from embedded_test_framework import Device, CommandResult, ConfigurationError, OperationTimeout, TransportError
-from embedded_test_framework.services import SSHShellService
+from embedded_test_framework.dut.services import SSHShellService
 
 
 def mock_device():

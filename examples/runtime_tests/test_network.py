@@ -1,5 +1,5 @@
 from embedded_test_framework import wait
-from embedded_test_framework.diagnostics import PerformanceMonitor
+from embedded_test_framework.helpers.evidence import PerformanceMonitor
 
 
 def test_networks(test_context):

@@ -1,4 +1,4 @@
-from ..logging import log_operation
+from ..libs.logging import log_operation
 """Standard-library HTTP transport; no automatic replay of requests."""
 import json
 import socket
@@ -7,7 +7,7 @@ import urllib.parse
 import urllib.request
 
 from .transport_base import HttpResponse, Transport
-from ..errors import ConfigurationError, OperationTimeout, TransportError
+from ..libs.errors import ConfigurationError, OperationTimeout, TransportError
 
 
 class HttpTransport(Transport):

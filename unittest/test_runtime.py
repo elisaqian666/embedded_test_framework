@@ -5,7 +5,7 @@ import pytest
 
 from embedded_test_framework import (TestContext, RuntimeConfig, ResourceRegistry, Registry, Device,
                                      ConfigurationError, CleanupError, TransportError)
-from embedded_test_framework.lab import Helper
+from embedded_test_framework.helpers import Helper
 
 
 def inventory():

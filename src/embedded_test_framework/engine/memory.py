@@ -1,6 +1,6 @@
-from ..logging import log_operation
+from ..libs.logging import log_operation
 from .transport_base import CommandResult, Transport
-from ..errors import TransportError
+from ..libs.errors import TransportError
 
 
 class MemoryTransport(Transport):

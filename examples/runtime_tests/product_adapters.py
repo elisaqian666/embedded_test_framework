@@ -2,8 +2,8 @@
 import json
 from pathlib import Path
 
-from embedded_test_framework.capabilities import NetworkCapability, LoggingCapability, PerformanceCapability
-from embedded_test_framework.lab import Helper
+from embedded_test_framework.dut.device_features import NetworkCapability, LoggingCapability, PerformanceCapability
+from embedded_test_framework.helpers import Helper
 
 
 class JsonNetwork(NetworkCapability):

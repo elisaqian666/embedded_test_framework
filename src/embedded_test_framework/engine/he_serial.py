@@ -1,9 +1,9 @@
-from ..logging import log_operation
+from ..libs.logging import log_operation
 import threading
 import time
 
 from .transport_base import Transport
-from ..errors import ConfigurationError, OperationTimeout, TransportError
+from ..libs.errors import ConfigurationError, OperationTimeout, TransportError
 
 
 class SerialTransport(Transport):
