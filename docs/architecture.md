@@ -41,26 +41,12 @@ Capability 的实现属于设备适配层，通过 `device.execute/request/excha
 
 ## 2. 与 PDF 的对应关系
 
-| PDF 思路 | 实现入口 | 行为与边界 |
-| --- | --- | --- |
-| Context / RuntimeConfig / ResourceRegistry（第 4–5 页） | `core/context.py`、`core/lifecycle.py` | 多设备、Helper、Service 统一构造；分层覆盖配置；资源所有权 |
-| Transport / Engine（第 5–6 页） | `engine/`、`core/contracts.py` | 复用现有六种引擎；按能力提供命令、请求、字节交换、文件传输 |
-| DUT（第 6–7 页） | `devices/device_base.py` | prepare、cleanup、reconnect；reboot、flash、日志、健康、崩溃能力委派 |
-| Feature / Capability（第 7–8 页） | `capabilities/`、`adapters/linux.py` | 能力挂在设备上；平台命令及解析下沉到适配器 |
-| Lab Helper（第 8–9 页） | `lab/`、`hosts/` | 电源、USB、显示、采集、分析、抓包、固件来源的标准接口；复用 LocalHost |
-| Wait / Watch（第 9–10 页） | `wait/` | until_true/false/equal/no_exception、stays_true/equal；显式异常重试 |
-| Lifecycle（第 10–11 页） | `testing/`、`pytest_plugin.py` | 保留 DeviceTestBase；新增多设备 EmbeddedTestCase、test_context fixture |
-| Diagnostics（第 11–12 页） | `diagnostics/` | Artifact、日志/崩溃采集、失败证据清单、pytest 报告路径 |
-| Performance（第 12 页） | `PerformanceMonitor`、`Measurement` | 有界采样、JSONL 保存、first/last/min/max/delta；阈值留在用例 |
-| Factory / Plugin（第 13 页） | `Registry`、`DeviceFactory` | protocol/device/host/capability/helper/service 注册；显式加载 entry point |
-
-PDF 列出的 Wi-Fi、蓝牙、音频、显示、安全、配对等是能力类型示例，不代表所有设备都具备。
+列出的 Wi-Fi、蓝牙、音频、显示、安全、配对等是能力类型示例，不代表所有设备都具备。
 统一扩展基类是 `Capability`；当前提供网络、日志、升级、电源、健康、崩溃、性能的标准契约。
 未声明的能力抛出 `CapabilityError`，不会以空方法或默认成功伪装支持。
 
 目前内置驱动仍是已有 SSH、ADB、HTTP、Serial、FTP、Memory。Telnet、Socket、WebSocket、
-CAN、Modbus 等通过同一 Transport/Capability 注册接口接入。本次未将 PDF 中列举的所有
-可选协议和仪器型号都做成未验证的内置驱动，也没有新增重型运行依赖。
+CAN、Modbus 等通过同一 Transport/Capability 注册接口接入。
 
 ## 3. 目录职责
 
