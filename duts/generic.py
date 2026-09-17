@@ -3,8 +3,7 @@
 import logging
 from typing import Any, Self
 
-from embedded_framework.configurator.configuration import DeviceConfig
-from embedded_framework.configurator.engine_factory import EngineFactory
+from embedded_framework.configurator.configurator_dut import DeviceConfig, EngineFactory
 from embedded_framework.helpers.he_common import CommonHelpers
 from embedded_framework.helpers.he_shell import CommandResult, ShellHelper
 from embedded_framework.lib.custom_exception import EmbeddedFrameworkException

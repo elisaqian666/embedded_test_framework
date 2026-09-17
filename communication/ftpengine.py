@@ -201,7 +201,7 @@ class FtpEngine:
 
                     retry_counter += 1
             if retry_counter >= 2:
-            raise EmbeddedFrameworkException("Too many retries, file size of source and destination never matched")
+                raise EmbeddedFrameworkException("Too many retries, file size of source and destination never matched")
 
         except Exception as excep:
             self.logger.error(excep)

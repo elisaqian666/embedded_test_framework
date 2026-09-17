@@ -3,13 +3,15 @@
 from collections.abc import Mapping
 import logging
 from pathlib import Path
-from unittest import TestCase
+from embedded_framework.basic_test_setup import BasicTestClass
 
+from embedded_framework.configurator.config_labels import LOGGERS
 from embedded_framework.lib import assertion
+
 from embedded_framework.runtime import Runtime, initialize_from_mapping
 
 
-class EmbeddedTestCase(TestCase):
+class EmbeddedTestCase(BasicTestClass):
     """Purpose: Initialize one configured DUT for a system-test subclass."""
 
     config: Mapping[str, object]
@@ -28,7 +30,9 @@ class EmbeddedTestCase(TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
-        cls.logger = logging.getLogger("test_case")
+        cls.logger = logging.getLogger(LOGGERS.TEST_CASE)
+        cls.logger.setLevel(logging.INFO)
+        cls.logger.propagate = True
         if not getattr(cls, "config", None) or not getattr(cls, "dut_name", None):
             raise RuntimeError("Set config and dut_name on the system-test subclass")
         cls.runtime = initialize_from_mapping(dict(cls.config), source=Path(__file__), connect=True)

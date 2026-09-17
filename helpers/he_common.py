@@ -8,6 +8,7 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from embedded_framework.helpers.he_host_pc import ContentHandler, SystemHelper
 from embedded_framework.lib.timeout import TimeoutParams, wait_timeout
 
 logger = logging.getLogger(__name__)
@@ -105,9 +106,11 @@ class CommonHelpers:
     """Small helper collection exposed by a runtime and each DUT."""
 
     def __init__(self) -> None:
+        self.content = ContentHandler()
         self.files = FileHelper()
         self.host = HostHelper()
         self.network = NetworkHelper()
+        self.system = SystemHelper()
 
     @staticmethod
     def wait_until(predicate: Callable[..., Any], *args: Any, timeout: float = 30, interval: float = 0.2, **kwargs: Any) -> Any:

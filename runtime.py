@@ -3,8 +3,7 @@
 from pathlib import Path
 from typing import Any, Self
 
-from embedded_framework.configurator.configuration import FrameworkConfig, load_config, load_mapping
-from embedded_framework.configurator.engine_factory import EngineFactory
+from embedded_framework.configurator.configurator_dut import EngineFactory, FrameworkConfig, load_config, load_mapping
 from embedded_framework.duts.generic import GenericDUT, make_dut
 from embedded_framework.helpers.he_common import CommonHelpers
 from embedded_framework.lib import assertion

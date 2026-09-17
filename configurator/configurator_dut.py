@@ -1,15 +1,22 @@
 """Data-only configuration for generic embedded devices (JSON or TOML)."""
 
 import copy
+import importlib
+import inspect
 import json
+import logging
+import math
 import os
 import re
+import socket
 import tomllib
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from embedded_framework.lib.custom_exception import EmbeddedFrameworkSetupError
+from embedded_framework.configurator.config_labels import LOGLEVELS, LOGGERS
 
 _ENVIRONMENT_VARIABLE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
@@ -128,7 +135,8 @@ def load_mapping(
     logging_values = _mapping(values.get("logging", {}), "logging")
     _known_keys(logging_values, {"level", "console", "file"}, "logging")
     level, console, log_file = logging_values.get("level", "INFO"), logging_values.get("console", True), logging_values.get("file")
-    if not isinstance(level, str) or level.upper() not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
+    log_levels = {LOGLEVELS.DEBUG, LOGLEVELS.INFO, LOGLEVELS.WARNING, LOGLEVELS.ERROR, LOGLEVELS.CRITICAL}
+    if not isinstance(level, str) or level.lower() not in log_levels:
         message = "logging.level must be DEBUG, INFO, WARNING, ERROR or CRITICAL"
         raise ConfigurationError(message)
     if not isinstance(console, bool) or (log_file is not None and (not isinstance(log_file, str) or not log_file)):
@@ -157,3 +165,114 @@ def load_config(path: str | Path, *, overrides: dict[str, Any] | None = None) ->
         message = f"Unable to read or parse configuration: {source.name}"
         raise ConfigurationError(message) from None
     return load_mapping(raw, source=source, overrides=overrides)
+
+
+_FACTORIES = {
+    "ssh": ("sshengine", "make_ssh_engine"),
+    "serial": ("serialengine", "make_serial_engine"),
+    "socket": ("socket_engine", "make_socket_engine"),
+    "tcp": ("socket_engine", "make_socket_engine"),
+    "udp": ("socket_engine", "make_socket_engine"),
+    "ftp": ("ftpengine", "make_ftp_engine"),
+    "ftps": ("ftpengine", "make_ftp_engine"),
+    "http": ("httpengine", "make_http_engine"),
+    "https": ("httpengine", "make_http_engine"),
+    "websocket": ("websocket_engine", "make_websocket_engine"),
+}
+_ENGINE_LOGGER_NAMES = {
+    "ssh": LOGGERS.SSH_ENGINE,
+    "serial": LOGGERS.SERIAL_ENGINE,
+    "socket": LOGGERS.SOCKET_ENGINE,
+    "tcp": LOGGERS.SOCKET_ENGINE,
+    "udp": LOGGERS.SOCKET_ENGINE,
+    "ftp": LOGGERS.FTP_ENGINE,
+    "ftps": LOGGERS.FTP_ENGINE,
+    "http": LOGGERS.HTTP_ENGINE,
+    "https": LOGGERS.HTTP_ENGINE,
+    "websocket": LOGGERS.WEBSOCKET_ENGINE,
+}
+_HTTP_AUTH_FIELDS = 2
+
+
+class EngineFactory:
+    """Create validated generic protocol engines from connection configuration."""
+
+    def __init__(self, factories: Mapping[str, Callable[..., Any]] | None = None) -> None:
+        self._factories = dict(factories or {})
+
+    def _resolve(self, connection: ConnectionConfig) -> tuple[Callable[..., Any], dict[str, Any]]:
+        protocol = connection.protocol
+        options = dict(connection.options)
+        if protocol in self._factories:
+            return self._factories[protocol], options
+        if protocol not in _FACTORIES:
+            raise ConfigurationError(f"Unsupported communication protocol: {protocol}")
+        module, name = _FACTORIES[protocol]
+        factory = getattr(importlib.import_module(f"embedded_framework.communication.{module}"), name)
+        if protocol in {"tcp", "udp"}:
+            options["s_type"] = socket.SOCK_DGRAM if protocol == "udp" else socket.SOCK_STREAM
+        if protocol == "ftps":
+            options["protocol"] = "ftps"
+        if protocol == "https" and not str(options.get("base_url", "")).startswith("https://"):
+            raise ConfigurationError("https connections require an https:// base_url")
+        if protocol in {"http", "https"} and isinstance(options.get("auth"), list):
+            if len(options["auth"]) != _HTTP_AUTH_FIELDS:
+                raise ConfigurationError("HTTP auth must contain username and password")
+            options["auth"] = tuple(options["auth"])
+        return factory, options
+
+    def validate(self, connection: ConnectionConfig) -> None:
+        """Validate factory options before opening a connection."""
+        factory, options = self._resolve(connection)
+        try:
+            inspect.signature(factory).bind(**options)
+            if connection.protocol in {"http", "https"} and connection.protocol not in self._factories:
+                engine_type = importlib.import_module("embedded_framework.communication.httpengine").HttpEngine
+                inspect.signature(engine_type).bind(**options)
+        except TypeError:
+            raise ConfigurationError(f"Invalid or missing factory options for protocol: {connection.protocol}") from None
+        if connection.protocol not in self._factories:
+            self._validate_options(options)
+
+    @staticmethod
+    def _validate_options(options: dict[str, Any]) -> None:
+        for name in ("timeout", "s_timeout", "read_timeout", "write_timeout"):
+            if name not in options:
+                continue
+            value = options[name]
+            minimum_inclusive = name in {"read_timeout", "write_timeout"}
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or (value < 0 if minimum_inclusive else value <= 0)
+            ):
+                expectation = "non-negative" if minimum_inclusive else "positive"
+                raise ConfigurationError(f"{name} must be a finite {expectation} number")
+        for name in ("host", "hostname", "address", "com_port", "username", "url", "base_url"):
+            if name in options and (not isinstance(options[name], str) or not options[name]):
+                raise ConfigurationError(f"{name} must be a non-empty string")
+        for name, minimum, maximum in (("port", 1, 65535), ("baudrate", 1, None), ("retry", 0, None)):
+            value = options.get(name)
+            if name in options and (type(value) is not int or value < minimum or (maximum is not None and value > maximum)):
+                raise ConfigurationError(f"Invalid integer option: {name}")
+
+    def create(self, connection: ConnectionConfig, *, logger: logging.Logger | None = None) -> Any:
+        """Create an engine and attach its protocol-specific logger."""
+        self.validate(connection)
+        factory, options = self._resolve(connection)
+        engine = factory(**options)
+        if not callable(getattr(engine, "close", None)):
+            raise TypeError("Engine factories must return an object with close()")
+        try:
+            if logger is not None and hasattr(engine, "logger"):
+                engine.logger = logger.getChild(_ENGINE_LOGGER_NAMES.get(connection.protocol, "engine"))
+            if connection.protocol == "serial":
+                engine.open_serial_connection()
+        except BaseException as error:
+            try:
+                engine.close()
+            except Exception as cleanup_error:  # noqa: BLE001 - preserve the initialization error
+                error.add_note(f"Engine cleanup also failed: {type(cleanup_error).__name__}")
+            raise
+        return engine
