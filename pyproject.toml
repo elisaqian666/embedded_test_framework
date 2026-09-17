@@ -1,0 +1,44 @@
+[project]
+name = "embedded-framework"
+version = "0.1.0"
+description = "Generic Python communication and device-initialization framework for embedded devices"
+readme = "README.MD"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "deprecation==2.1.0",
+    "gevent==26.7.0",
+    "paramiko==3.5.1",
+    "pyserial==3.5",
+    "requests==2.34.2",
+    "scp==0.16.1",
+    "ws4py==0.6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black==26.5.1",
+    "pytest==9.1.1",
+    "ruff==0.16.7",
+]
+
+[build-system]
+requires = ["setuptools>=70", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["embedded_framework*"]
+
+[tool.black]
+line-length = 140
+
+[tool.ruff]
+line-length = 140
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]

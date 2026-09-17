@@ -1,0 +1,3 @@
+include LICENSE README.MD requirements-communication.txt pyproject.toml
+recursive-include embedded_framework *.py *.md
+global-exclude __pycache__ *.py[cod]
