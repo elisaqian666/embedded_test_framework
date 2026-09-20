@@ -77,31 +77,6 @@ class HostHelper:
         )
 
 
-class NetworkHelper:
-    """TCP reachability checks independent of ICMP permissions and device OS."""
-
-    @staticmethod
-    def is_port_open(host: str, port: int, timeout: float = 1) -> bool:
-        """Check whether a TCP connection can be established and immediately release it."""
-        if timeout <= 0:
-            message = "timeout must be positive"
-            raise ValueError(message)
-        try:
-            with socket.create_connection((host, port), timeout=timeout):
-                return True
-        except OSError:
-            return False
-
-    @staticmethod
-    def wait_for_port(host: str, port: int, *, timeout: float = 30, interval: float = 0.2) -> bool:
-        """Poll TCP availability using the framework's existing timeout mechanism."""
-        if timeout <= 0 or interval <= 0:
-            message = "timeout and interval must be positive"
-            raise ValueError(message)
-        params = TimeoutParams(timeout, f"TCP endpoint did not become available: {host}:{port}", interval)
-        return wait_timeout(NetworkHelper.is_port_open, params, host, port, min(timeout, 1))
-
-
 class CommonHelpers:
     """Small helper collection exposed by a runtime and each DUT."""
 

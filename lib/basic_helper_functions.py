@@ -27,26 +27,6 @@ def setify(value: Any) -> set[Any]:
     return set(value) if is_iterable(value) and not is_string(value) else {value}
 
 
-def os_is_windows() -> bool:
-    """Return whether the current host is Windows."""
-    return platform.system() == "Windows"
-
-
-def os_is_macos() -> bool:
-    """Return whether the current host is macOS."""
-    return platform.system() == "Darwin"
-
-
-def os_is_linux() -> bool:
-    """Return whether the current host is Linux."""
-    return platform.system() == "Linux"
-
-
-def hostname_to_ip(hostname: str) -> str:
-    """Resolve one host name to an IPv4 address."""
-    return socket.gethostbyname(hostname)
-
-
 def get_parent_that_defined_method(method) -> str:
     """Return a readable owner name for a function or bound method."""
     owner = getattr(method, "__self__", None)

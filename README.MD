@@ -46,18 +46,16 @@ transport interfaces and connection configuration fields.
 ## System-test example
 
 The SSH command and SCP upload examples are in `system_tests/test_examples/`.
-Set `EMBEDDED_SSH_HOST`, `EMBEDDED_SSH_USERNAME`, and
-`EMBEDDED_SSH_PASSWORD`, then run them from the repository root:
+Update the DUT addresses and credentials in
+`system_tests/config/test_config.py`, then run them from the repository root:
 
 ```bash
 python -m unittest system_tests.test_examples.test_ssh_command system_tests.test_examples.test_scp_upload
 ```
 
-Its configuration is kept separately in
-`system_tests/config/embedded_test_config.py`. The test class inherits from
-`embedded_framework.testing.EmbeddedTestCase`; it initializes the named DUT,
-exposes `self.logger` with the name `test_case`, executes commands or SCP transfers, and provides
-`assertEqual` and `assertTrue` through the framework assertion layer.
+The test class inherits from `embedded_framework.setup.EmbeddedTestCase`.
+Set `dut_name` for one DUT, or `dut_names` for several; all selected DUTs are
+available through `self.duts`, and the first is also available as `self.dut`.
 
 ## Scope
 

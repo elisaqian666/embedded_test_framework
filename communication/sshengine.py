@@ -7,13 +7,14 @@ import select
 import socketserver
 import threading
 import time
+import logging
 from functools import wraps
 
 import deprecation
 import gevent
 import scp
 from paramiko import AuthenticationException, AutoAddPolicy, SSHClient, SSHException
-
+from embedded_framework.configurator.config_labels import LOGGERS
 from embedded_framework.communication._text import decode_to_str_if_byte
 from embedded_framework.lib.basic_helper_functions import listify
 from embedded_framework.lib.custom_exception import EmbeddedFrameworkException
@@ -69,10 +70,9 @@ class SshEngine(object):
         self.username = username
         self.password = password
         self.port = port
-        self.logger = logging.getLogger("ssh")
         self.session = None
         self._lock = threading.RLock()
-        self._prev_level_ssh = self.logger.level
+        self.logger = logging.getLogger(LOGGERS.HELPER)
 
     @staticmethod
     def __protocol__():

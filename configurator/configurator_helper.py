@@ -1,6 +1,8 @@
 """Store generic configuration data for embedded devices, including logging and connection settings."""
 import enum
 import time
+import jenkins
+import requests
 from collections import namedtuple
 from dataclasses import dataclass
 from importlib.resources import files
@@ -46,3 +48,9 @@ class OTATimeouts(enum.Enum):
     DOWNLOADING: 300
     INSTALLING: 600
 
+https_credentials = {"admin": "admin"}
+Credentials = namedtuple("Credentials", ["username", "passwords"])
+jenkins_credentials = {
+    "http://192.168.1.104:8080": Credentials("g_svn_hudson", "c4DYSt9rzQHth5kG"),
+}
+jenkins_url = "http://192.168.1.104:8080"

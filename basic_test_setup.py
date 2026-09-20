@@ -3,6 +3,7 @@ import logging
 import pytest
 import os
 import deprecation
+from pathlib import Path
 from unittest import TestCase, SkipTest
 from typing import Dict
 
@@ -222,10 +223,10 @@ class BasicTestClass(UnittestTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        config_file = os.getenv("TESTCONFIG", None)
+        config_file = os.getenv("TESTCONFIG") or str(
+            Path(__file__).resolve().parents[1] / "system_tests" / "config" / "test_config.py"
+        )
         cls.config_file = config_file
-        if config_file is None:
-            raise ValueError("Test configuration file name not provided!")
         cls._print_test_environment()
         cls.logger.info("opening %s as config file", cls.config_file)
 

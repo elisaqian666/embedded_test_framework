@@ -1,8 +1,10 @@
 """Purpose: Provide a reusable unittest base class for embedded system tests."""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+import importlib.util
 import logging
 from pathlib import Path
+from typing import Any
 from embedded_framework.basic_test_setup import BasicTestClass
 
 from embedded_framework.configurator.config_labels import LOGGERS
@@ -14,8 +16,9 @@ from embedded_framework.runtime import Runtime, initialize_from_mapping
 class EmbeddedTestCase(BasicTestClass):
     """Purpose: Initialize one configured DUT for a system-test subclass."""
 
-    config: Mapping[str, object]
-    dut_name: str
+    config: Mapping[str, object] | None = None
+    dut_name: str | None = None
+    dut_names: Sequence[str] | None = None
     runtime: Runtime
     logger: logging.Logger
 
@@ -33,10 +36,29 @@ class EmbeddedTestCase(BasicTestClass):
         cls.logger = logging.getLogger(LOGGERS.TEST_CASE)
         cls.logger.setLevel(logging.INFO)
         cls.logger.propagate = True
-        if not getattr(cls, "config", None) or not getattr(cls, "dut_name", None):
-            raise RuntimeError("Set config and dut_name on the system-test subclass")
-        cls.runtime = initialize_from_mapping(dict(cls.config), source=Path(__file__), connect=True)
-        cls.dut = cls.runtime.duts[cls.dut_name]
+        config = dict(cls.config) if cls.config else cls._load_config(Path(cls.config_file))
+        names = tuple(cls.dut_names or (() if cls.dut_name is None else (cls.dut_name,)))
+        if not names:
+            raise RuntimeError("Set dut_name or dut_names on the system-test subclass")
+        devices = config.get("devices")
+        if not isinstance(devices, Mapping) or any(name not in devices for name in names):
+            raise RuntimeError("Every requested DUT must be defined in the test configuration")
+        config["devices"] = {name: devices[name] for name in names}
+        cls.runtime = initialize_from_mapping(config, source=cls.config_file, connect=True)
+        cls.duts = cls.runtime.duts
+        cls.dut = cls.duts[names[0]]
+
+    @staticmethod
+    def _load_config(path: Path) -> dict[str, Any]:
+        spec = importlib.util.spec_from_file_location("system_test_config", path)
+        if spec is None or spec.loader is None:
+            raise RuntimeError(f"Unable to load test configuration: {path}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        config = getattr(module, "config", None)
+        if not isinstance(config, dict):
+            raise RuntimeError(f"Test configuration must define a dict named config: {path}")
+        return config
 
     @classmethod
     def tearDownClass(cls) -> None:
