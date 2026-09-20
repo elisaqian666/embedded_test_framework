@@ -47,10 +47,3 @@ class OTATimeouts(enum.Enum):
     WAIT_FOR_READY: 100
     DOWNLOADING: 300
     INSTALLING: 600
-
-https_credentials = {"admin": "admin"}
-Credentials = namedtuple("Credentials", ["username", "passwords"])
-jenkins_credentials = {
-    "http://192.168.1.104:8080": Credentials("g_svn_hudson", "c4DYSt9rzQHth5kG"),
-}
-jenkins_url = "http://192.168.1.104:8080"

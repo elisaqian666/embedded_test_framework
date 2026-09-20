@@ -3,6 +3,7 @@ deprecation==2.1.0
 gevent==26.7.0
 paramiko==3.5.1
 pyserial==3.5
+python-jenkins==1.8.3
 requests==2.34.2
 scp==0.16.1
 ws4py==0.6.0
