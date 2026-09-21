@@ -2,7 +2,7 @@ pipeline {
     agent { label 'docker' }
 
     environment {
-        ARTIFACTORY_REGISTRY = '192.168.1.101:8082'
+        ARTIFACTORY_REGISTRY = 'jfrog.local'
         ARTIFACTORY_DOCKER_REPO = 'embedded-test-local'
         IMAGE = "${ARTIFACTORY_REGISTRY}/${ARTIFACTORY_DOCKER_REPO}/embedded-framework"
     }
@@ -15,10 +15,15 @@ pipeline {
             }
         }
         stage('Publish image') {
-            when { branch 'main' }
+            when { branch 'master' }
             steps {
                 sh 'docker tag embedded-framework-test:${BUILD_NUMBER} ${IMAGE}:${BUILD_NUMBER}'
-                withCredentials([usernamePassword(credentialsId: 'artifactory-docker', usernameVariable: 'ARTIFACTORY_USER', passwordVariable: 'ARTIFACTORY_TOKEN')]) {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'jfrog-credentials', 
+                        usernameVariable: 'ARTIFACTORY_USER', 
+                        passwordVariable: 'ARTIFACTORY_TOKEN')
+                        ]) {
                     sh 'echo "$ARTIFACTORY_TOKEN" | docker login "$ARTIFACTORY_REGISTRY" --username "$ARTIFACTORY_USER" --password-stdin'
                     sh 'docker push ${IMAGE}:${BUILD_NUMBER}'
                 }
