@@ -21,7 +21,7 @@ pipeline {
             steps {
                 sh 'rm -rf test-results && mkdir -p test-results'
                 sh 'docker build -t embedded-framework-test:${BUILD_NUMBER} .'
-                sh 'docker run --rm -v "$WORKSPACE/test-results:/test-results" embedded-framework-test:${BUILD_NUMBER} python -m pytest -q /app/embedded_framework/tests --junitxml=/test-results/junit-${BUILD_NUMBER}.xml'
+                sh 'docker run --rm -v "$WORKSPACE/test-results:/test-results" embedded-framework-test:${BUILD_NUMBER} python -m pytest -q /app/embedded_framework/unittest --junitxml=/test-results/junit-${BUILD_NUMBER}.xml'
             }
         }
         stage('Publish image') {
