@@ -2,7 +2,7 @@ pipeline {
     agent { label 'docker' }
 
     environment {
-        ARTIFACTORY_REGISTRY = '192.168.1.104:8081'
+        ARTIFACTORY_REGISTRY = '192.168.1.101:8082'
         ARTIFACTORY_DOCKER_REPO = 'embedded-test-local'
         IMAGE = "${ARTIFACTORY_REGISTRY}/${ARTIFACTORY_DOCKER_REPO}/embedded-framework"
     }
