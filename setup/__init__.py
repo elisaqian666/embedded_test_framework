@@ -1,15 +1,14 @@
 """Purpose: Provide a reusable unittest base class for embedded system tests."""
 
-from collections.abc import Mapping, Sequence
 import importlib.util
 import logging
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
-from embedded_framework.basic_test_setup import BasicTestClass
 
+from embedded_framework.basic_test_setup import BasicTestClass
 from embedded_framework.configurator.config_labels import LOGGERS
 from embedded_framework.lib import assertion
-
 from embedded_framework.runtime import Runtime, initialize_from_mapping
 
 

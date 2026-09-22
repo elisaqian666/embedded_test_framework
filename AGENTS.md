@@ -49,7 +49,7 @@ embedded_framework/
 ├── lib/               Assertions, logging, polling, timers, and exceptions
 ├── unittest/          Unit tests for framework modules
 ├── basic_test_setup.py  pytest/unittest-compatible test base
-├── setup.py             EmbeddedTestCase: configuration-backed system-test base
+├── setup/               EmbeddedTestCase: configuration-backed system-test base
 ├── runtime.py           Public initialize() entry point and Runtime owner
 ├── __init__.py          Public package exports
 ├── README.MD            Package overview and quick start
