@@ -10,6 +10,7 @@ context-manager protocol.
 | `ftpengine` | FTP and FTPS | `make_ftp_engine` |
 | `httpengine` | HTTP and HTTPS | `make_http_engine` |
 | `serialengine` | Serial/UART | `make_serial_engine` |
+| `modbusengine` | RS-485 Modbus RTU | `make_modbus_rtu_engine` |
 | `socket_engine` | TCP and UDP sockets | `make_socket_engine` |
 | `websocket_engine` | WebSocket | `make_websocket_engine` |
 

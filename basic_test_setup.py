@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest import TestCase, SkipTest
 from typing import Dict
 
-from embedded_framework.lib.logging_extras import setup_global_logging, ascii_box_render
+from embedded_framework.lib.logging_extras import ascii_box_render, setup_global_logging, setup_test_log_folder
 from embedded_framework.lib.custom_exception import append_string_to_exception_message
 from embedded_framework.lib.timeout import (
     DEFAULT_NO_SPAM_SLEEP,
@@ -223,12 +223,19 @@ class BasicTestClass(UnittestTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        cls._initialize_log_folder()
         config_file = os.getenv("TESTCONFIG") or str(
             Path(__file__).resolve().parents[1] / "system_tests" / "config" / "test_config.py"
         )
         cls.config_file = config_file
         cls._print_test_environment()
         cls.logger.info("opening %s as config file", cls.config_file)
+
+    @classmethod
+    def _initialize_log_folder(cls) -> None:
+        """Create one timestamped result directory for this test process."""
+        cls.base_log_store_folder = str(setup_test_log_folder())
+        cls.test_method_log_store_folder = cls.base_log_store_folder
 
     @classmethod
     def _print_test_environment(cls):

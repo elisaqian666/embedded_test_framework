@@ -170,6 +170,7 @@ def load_config(path: str | Path, *, overrides: dict[str, Any] | None = None) ->
 _FACTORIES = {
     "ssh": ("sshengine", "make_ssh_engine"),
     "serial": ("serialengine", "make_serial_engine"),
+    "modbus": ("modbusengine", "make_modbus_rtu_engine"),
     "socket": ("socket_engine", "make_socket_engine"),
     "tcp": ("socket_engine", "make_socket_engine"),
     "udp": ("socket_engine", "make_socket_engine"),
@@ -182,6 +183,7 @@ _FACTORIES = {
 _ENGINE_LOGGER_NAMES = {
     "ssh": LOGGERS.SSH_ENGINE,
     "serial": LOGGERS.SERIAL_ENGINE,
+    "modbus": LOGGERS.SERIAL_ENGINE,
     "socket": LOGGERS.SOCKET_ENGINE,
     "tcp": LOGGERS.SOCKET_ENGINE,
     "udp": LOGGERS.SOCKET_ENGINE,
@@ -236,6 +238,8 @@ class EngineFactory:
 
     @staticmethod
     def _validate_options(options: dict[str, Any]) -> None:
+        if "rs485" in options and type(options["rs485"]) is not bool:
+            raise ConfigurationError("rs485 must be boolean")
         for name in ("timeout", "s_timeout", "read_timeout", "write_timeout"):
             if name not in options:
                 continue
