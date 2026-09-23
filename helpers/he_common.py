@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from embedded_framework.helpers.he_host_pc import ContentHandler, SystemHelper
+from embedded_framework.helpers.he_network import NetworkHelper
 from embedded_framework.lib.timeout import TimeoutParams, wait_timeout
 
 logger = logging.getLogger(__name__)

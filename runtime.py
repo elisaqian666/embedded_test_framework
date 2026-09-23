@@ -11,6 +11,7 @@ from embedded_framework.configurator.configurator_dut import (
 )
 from embedded_framework.duts.generic import GenericDUT, make_dut
 from embedded_framework.helpers.he_common import CommonHelpers
+from embedded_framework.helpers.he_oscilloscope import RigolOscilloscope
 from embedded_framework.lib import assertion
 
 
@@ -41,6 +42,12 @@ class Runtime:
             )
             for name, device in config.devices.items()
         }
+        self.oscilloscope = None
+        if config.oscilloscope and config.oscilloscope.enable:
+            scope = config.oscilloscope
+            if scope.model != "rigol":
+                raise ValueError(f"Unsupported oscilloscope model: {scope.model}")
+            self.oscilloscope = RigolOscilloscope(scope.host, scope.port, scope.timeout)
 
         self._closed = False
 
@@ -53,6 +60,8 @@ class Runtime:
         try:
             for dut in self.duts.values():
                 dut.connect()
+            if self.oscilloscope:
+                self.oscilloscope.connect()
 
         except BaseException as error:
             try:
@@ -73,6 +82,12 @@ class Runtime:
         for dut in reversed(list(self.duts.values())):
             try:
                 dut.close()
+            except Exception as error:  # noqa: BLE001
+                errors.append(error)
+
+        if self.oscilloscope:
+            try:
+                self.oscilloscope.close()
             except Exception as error:  # noqa: BLE001
                 errors.append(error)
 

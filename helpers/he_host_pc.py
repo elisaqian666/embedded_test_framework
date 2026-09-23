@@ -180,6 +180,11 @@ class SystemHelper(object):
         return target
 
     @staticmethod
+    def check_folder(path: str | Path) -> Path:
+        """Create a test-artifact folder when needed and return it."""
+        return SystemHelper.create_directory(path)
+
+    @staticmethod
     def export_environment_variable(name: str, value: str, *, persistent: bool = False) -> None:
         """Set an environment variable for this process or persist it for the Windows user."""
         if not name or "=" in name or "\x00" in name or "\x00" in value:

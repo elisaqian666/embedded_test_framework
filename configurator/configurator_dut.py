@@ -91,11 +91,23 @@ class LoggingConfig:
 
 
 @dataclass(frozen=True)
+class OscilloscopeConfig:
+    """Optional oscilloscope configuration; host is required only when enabled."""
+
+    model: str
+    enable: bool
+    host: str | None = None
+    port: int = 5555
+    timeout: float = 5
+
+
+@dataclass(frozen=True)
 class FrameworkConfig:
     """Validated configuration, without any imported executable config module."""
 
     devices: dict[str, DeviceConfig]
     logging: LoggingConfig
+    oscilloscope: OscilloscopeConfig | None
     source: Path
 
 
@@ -124,13 +136,35 @@ def _device(name: str, raw: Any) -> DeviceConfig:
     return DeviceConfig(name, connections, default, copy.deepcopy(_mapping(values.get("metadata", {}), f"devices.{name}.metadata")))
 
 
+def _oscilloscope(raw: Any) -> OscilloscopeConfig:
+    values = _mapping(raw, "osciiloscope")
+    _known_keys(values, {"model", "enable", "host", "port", "timeout"}, "osciiloscope")
+    model, enable = values.get("model"), values.get("enable")
+    if not isinstance(model, str) or not model or type(enable) is not bool:
+        raise ConfigurationError("osciiloscope requires a non-empty model and boolean enable")
+    host = values.get("host")
+    if enable and (not isinstance(host, str) or not host):
+        raise ConfigurationError("enabled osciiloscope requires a non-empty host")
+    port, timeout = values.get("port", 5555), values.get("timeout", 5)
+    if (
+        type(port) is not int
+        or not 1 <= port <= 65535
+        or isinstance(timeout, bool)
+        or not isinstance(timeout, (int, float))
+        or not math.isfinite(timeout)
+        or timeout <= 0
+    ):
+        raise ConfigurationError("osciiloscope port must be 1..65535 and timeout must be positive")
+    return OscilloscopeConfig(model.lower(), enable, host, port, float(timeout))
+
+
 def load_mapping(
     raw: dict[str, Any], *, source: str | Path = "embedded_test_config.py", overrides: dict[str, Any] | None = None
 ) -> FrameworkConfig:
     """Validate a configuration mapping without executing a configuration module."""
     source_path = Path(source).expanduser().resolve()
     values = _expand_environment(_merge(_mapping(raw, "configuration"), _mapping(overrides or {}, "overrides")))
-    _known_keys(values, {"devices", "logging"}, "configuration")
+    _known_keys(values, {"devices", "logging", "osciiloscope"}, "configuration")
     devices = {name: _device(name, value) for name, value in _mapping(values.get("devices", {}), "devices").items()}
     logging_values = _mapping(values.get("logging", {}), "logging")
     _known_keys(logging_values, {"level", "console", "file"}, "logging")
@@ -143,7 +177,8 @@ def load_mapping(
         message = "logging.console must be boolean; logging.file must be a non-empty path"
         raise ConfigurationError(message)
     log_path = (source_path.parent / Path(log_file).expanduser()).resolve() if log_file else None
-    return FrameworkConfig(devices, LoggingConfig(level.upper(), console, log_path), source_path)
+    oscilloscope = _oscilloscope(values["osciiloscope"]) if "osciiloscope" in values else None
+    return FrameworkConfig(devices, LoggingConfig(level.upper(), console, log_path), oscilloscope, source_path)
 
 
 def load_config(path: str | Path, *, overrides: dict[str, Any] | None = None) -> FrameworkConfig:
