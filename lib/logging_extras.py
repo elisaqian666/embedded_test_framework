@@ -51,9 +51,10 @@ def setup_test_log_folder() -> Path:
     """Create and return the single timestamped result folder for this process."""
     global _TEST_LOG_FOLDER
     if _TEST_LOG_FOLDER is None:
-        _TEST_LOG_FOLDER = Path.cwd() / "test_logs" / datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        _TEST_LOG_FOLDER = Path(__file__).resolve().parents[2] / "test_logs" / datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         _TEST_LOG_FOLDER.mkdir(parents=True)
         setup_global_logging(log_file=_TEST_LOG_FOLDER / "test.log")
+        (_TEST_LOG_FOLDER / "test-results.txt").touch()
     return _TEST_LOG_FOLDER
 
 def ascii_box_render(string_to_frame, padding=0, header=""):

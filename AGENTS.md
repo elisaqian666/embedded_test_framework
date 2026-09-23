@@ -62,7 +62,6 @@ system_tests/
 ├── config/             Test-only device definitions and configuration tests
 ├── test_examples/      Runnable SSH, SCP, and host-PC examples
 ├── test_config_loading.py  Validates shared configuration loading
-├── test_he_oscilloscope.py  Simulates RIGOL SCPI framing
 └── test_modbusengine.py     Simulates a Modbus RTU response and CRC
 ```
 
@@ -120,7 +119,9 @@ checks or real-device tests under `system_tests/` as appropriate.
    Unit tests may instead call `initialize(path)` with a JSON/TOML file or
    `load_mapping()` directly.
 3. `load_config()` parses JSON/TOML then `load_mapping()` validates the root,
-   devices, connections, and logging. Environment references such as
+   devices, connections, logging, and optional `osciiloscope`. When enabled,
+   the only supported model is `rigol` and `host` is required; Runtime pings
+   and connects it during setup. Environment references such as
    `${EMBEDDED_SSH_HOST}` are expanded before engine creation; missing values
    fail without exposing secrets.
 4. `Runtime` validates every connection through `EngineFactory` before any

@@ -2,6 +2,7 @@
 import logging
 import pytest
 import os
+import re
 import deprecation
 from pathlib import Path
 from unittest import TestCase, SkipTest
@@ -27,6 +28,31 @@ from embedded_framework.configurator.config_labels import LOGGERS
 logger = logging.getLogger(LOGGERS.TEST_CASE)
 
 _LOG_INITIALIZED = False
+_TEST_RESULTS: dict[str, str] = {}
+
+
+class _TestResultReporter:
+    @pytest.hookimpl
+    def pytest_runtest_logreport(self, report):
+        if report.failed:
+            _TEST_RESULTS[report.nodeid] = "FAILED"
+        elif report.when == "call" and report.passed:
+            _TEST_RESULTS.setdefault(report.nodeid, "PASSED")
+
+    @pytest.hookimpl
+    def pytest_sessionfinish(self, session, exitstatus):
+        with (setup_test_log_folder() / "test-results.txt").open("w", encoding="utf-8") as stream:
+            for outcome in ("PASSED", "FAILED"):
+                for nodeid, result in _TEST_RESULTS.items():
+                    if result == outcome:
+                        stream.write(f"{outcome} {nodeid}\n")
+
+
+def _register_failed_case_reporter(config: pytest.Config) -> None:
+    if not config.pluginmanager.hasplugin("embedded-framework-failed-case-reporter"):
+        config.pluginmanager.register(_TestResultReporter(), "embedded-framework-failed-case-reporter")
+
+
 class UnittestTestCase:
     """
     This class holds everything of unittest.TestCase for us to deprecate it in future.
@@ -96,6 +122,8 @@ class UnittestTestCase:
     @pytest.fixture(scope="class", autouse=True)
     def setup_teardown_class_fixture(cls, request):
         """Simulate unittest.TestCase's setUpClass and tearDownClass using pytest fixtures"""
+        setup_test_log_folder()
+        _register_failed_case_reporter(request.config)
         logger.info("setup_class_fixture starting...")
         cls.pytest_request = request  # Store the request for potential use in tests
         cls.setUpClass()
@@ -110,6 +138,7 @@ class UnittestTestCase:
     @pytest.fixture(autouse=True)
     def setup_teardown_fixture(self, get_cur_test_id):
         """Simulate unittest.TestCase's setUp and tearDown using pytest fixtures"""
+        logger.info("========== TEST START: %s =========", self._test_id)
         logger.info("setup_fixture starting...")
         self.setUp()
         yield
@@ -118,6 +147,7 @@ class UnittestTestCase:
 
         # Backward compatibility of unittest.TestCase
         self.doCleanups()
+        logger.info("=========== TEST END: %s ===========", self._test_id)
 
     @classmethod
     def setUpClass(cls):
@@ -204,13 +234,14 @@ class BasicTestClass(UnittestTestCase):
 
     logger = logging.getLogger(LOGGERS.TEST_CASE)
 
-    # {'dut_baseunit': [id1, id2], 'dut_client': {'portable_app': ['clt3'], 'button_app': [clt2], 'dut_button': ['GEN4'],
-    # 'dut_binaries': ['baseunitapp', 'buttoncontroller', ...]}
+   
     dut_in_test_dict: Dict | None = None
-    # overrule setup parameter: dictionary setup key, {'pair_button_to_use': False, 'dut_button': ['GEN4'], ...... }
+    # overrule setup parameter: dictionary setup key, {'enable_..': False}
     overrule_settings = None
-    base_log_store_folder = os.path.join(os.getcwd(), "test_logs")
+    base_log_store_folder = str(Path(__file__).resolve().parents[1] / "test_logs")
+    test_class_log_store_folder = base_log_store_folder
     test_method_log_store_folder = base_log_store_folder
+    test_summary_file = str(Path(base_log_store_folder) / "summary.txt")
     config_file: str
 
     def __init_subclass__(cls, *args, **kwargs):
@@ -235,7 +266,18 @@ class BasicTestClass(UnittestTestCase):
     def _initialize_log_folder(cls) -> None:
         """Create one timestamped result directory for this test process."""
         cls.base_log_store_folder = str(setup_test_log_folder())
-        cls.test_method_log_store_folder = cls.base_log_store_folder
+        class_folder = Path(cls.base_log_store_folder) / re.sub(r"[^A-Za-z0-9._-]+", "_", f"{cls.__module__}.{cls.__name__}")
+        class_folder.mkdir(parents=True, exist_ok=True)
+        cls.test_class_log_store_folder = str(class_folder)
+        cls.test_method_log_store_folder = cls.test_class_log_store_folder
+        cls.test_summary_file = str(class_folder / "summary.txt")
+        Path(cls.test_summary_file).touch(exist_ok=True)
+
+    def setUp(self):
+        super().setUp()
+        method_folder = Path(self.test_class_log_store_folder) / re.sub(r"[^A-Za-z0-9._-]+", "_", self._test_id.rsplit("::", 1)[-1])
+        method_folder.mkdir(parents=True, exist_ok=True)
+        self.test_method_log_store_folder = str(method_folder)
 
     @classmethod
     def _print_test_environment(cls):
