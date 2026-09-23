@@ -66,6 +66,7 @@ class RigolOscilloscope(IOscilloscope):
             raise ValueError("host, port (1..65535), and timeout must be valid")
         self.host, self.port, self.timeout = host, port, timeout
         self._socket: socket.socket | None = None
+        self._buffer = bytearray()
 
     def ping(self) -> bool:
         """Return whether the oscilloscope responds to one ICMP echo request."""
@@ -91,6 +92,7 @@ class RigolOscilloscope(IOscilloscope):
         if self._socket is not None:
             self._socket.close()
             self._socket = None
+        self._buffer.clear()
 
     def command(self, scpi: str) -> None:
         """Send one SCPI command."""
@@ -111,20 +113,23 @@ class RigolOscilloscope(IOscilloscope):
         return self._read_until(b"\n").decode().strip()
 
     def _read_until(self, delimiter: bytes) -> bytes:
-        data = bytearray()
-        while not data.endswith(delimiter):
+        while (end := self._buffer.find(delimiter)) < 0:
             if not (chunk := self._socket.recv(4096)):
                 raise ConnectionError("Oscilloscope closed the connection")
-            data.extend(chunk)
-        return bytes(data)
+            self._buffer.extend(chunk)
+        end += len(delimiter)
+        data = bytes(self._buffer[:end])
+        del self._buffer[:end]
+        return data
 
     def _read_exactly(self, size: int) -> bytes:
-        data = bytearray()
-        while len(data) < size:
-            if not (chunk := self._socket.recv(size - len(data))):
+        while len(self._buffer) < size:
+            if not (chunk := self._socket.recv(4096)):
                 raise ConnectionError("Oscilloscope closed the connection")
-            data.extend(chunk)
-        return bytes(data)
+            self._buffer.extend(chunk)
+        data = bytes(self._buffer[:size])
+        del self._buffer[:size]
+        return data
 
     def identify(self) -> str:
         return self.query("*IDN?")
