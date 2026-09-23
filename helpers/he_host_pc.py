@@ -14,7 +14,6 @@ import tarfile
 import platform
 import zipfile
 import logging
-import pyautogui
 
 from collections.abc import Iterable, Sequence
 from pathlib import Path
@@ -122,6 +121,8 @@ class SystemHelper(object):
     def get_screenshot(destination: str | Path) -> Path:
         """Capture the desktop on Windows using pyautogui and save a PNG."""
         SystemHelper._require_windows()
+        import pyautogui
+
         target = Path(destination).resolve()
         target.parent.mkdir(parents=True, exist_ok=True)
 
