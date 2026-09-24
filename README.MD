@@ -94,6 +94,83 @@ Use `GIVEN`, `WHEN`, and `THEN` comments in every system-test method:
 Do not add pytest markers or `pytest.ini` for these tests. Hardware that is
 not configured may skip through its test's explicit configuration rule.
 
+## System-test call chains
+
+Every `EmbeddedTestCase` follows this framework lifecycle. `Runtime` owns all
+configured connections; individual test methods must not close them.
+
+```mermaid
+flowchart TD
+    P[pytest test method] --> F[UnittestTestCase pytest fixtures]
+    F --> B[BasicTestClass.setUpClass\ncreate test_logs and select config file]
+    B --> E[EmbeddedTestCase.setUpClass\nload config and select dut_name]
+    E --> R[Runtime.from_mapping\nvalidate all connection options]
+    R --> D[DeviceFactory\nmetadata.type selects Device]
+    D --> C[Runtime.connect]
+    C --> BD[BaseDevice.connect]
+    BD --> EF[EngineFactory.create\nvalidate and build connection]
+    EF --> H[Transport / hardware]
+    H --> T[Test method uses self.dut or self.engine]
+    T --> X[EmbeddedTestCase.tearDownClass]
+    X --> RC[Runtime.close → BaseDevice.close → Transport.close]
+```
+
+### STM32 UART reference chain
+
+`TestStm32Reference` selects `serial_dut` from `config/test_config.py`.
+`STM32_REFERENCE_PORT` supplies its serial port value.
+
+```mermaid
+flowchart TD
+    ST[TestStm32Reference] --> SC[serial_dut\nmetadata.type = stm32]
+    SC --> DF[DeviceFactory]
+    DF --> SD[Stm32Device]
+    SD --> BF[BaseDevice.connect]
+    BF --> EF[EngineFactory.create\nprotocol = serial]
+    EF --> MS[make_serial_transport]
+    MS --> STR[SerialTransport\nopens serial connection]
+    STR --> PY[pyserial.Serial]
+    PY --> UART[STM32 UART]
+    ST --> API[self.dut.serial]
+    API --> STR
+    STR --> READ[SerialTransport.read]
+```
+
+The UART case reads ten raw chunks. It does not call `connect()` or `close()`:
+the Runtime has already opened the port and owns its cleanup.
+
+### Linux SSH reference chain
+
+`TestLinuxSshReference` selects `ssh_dut`, declares
+`Capability.SHELL`, and requests the `ssh` engine. `EmbeddedTestCase` validates
+the capability and exposes the connected transport as `self.engine`.
+
+```mermaid
+flowchart TD
+    LT[TestLinuxSshReference] --> LC[ssh_dut\nmetadata.type = linux]
+    LC --> DF[DeviceFactory]
+    DF --> LD[LinuxDevice]
+    LD --> BF[BaseDevice.connect]
+    BF --> EF[EngineFactory.create\nprotocol = ssh]
+    EF --> MS[make_ssh_transport]
+    MS --> SSH[SshTransport]
+    SSH --> PM[paramiko.SSHClient]
+    PM --> HOST[Linux SSH server]
+    LT --> ENGINE[self.engine]
+    ENGINE --> SSH
+    LT --> SHELL[self.dut.shell]
+    SHELL --> SH[ShellHelper]
+    SH --> CMD[SshTransport.do_command]
+    CMD --> PM
+    LT --> EXEC[self.dut.execute]
+    EXEC --> STATUS[SshTransport.do_command_w_exitstatus]
+    STATUS --> PM
+```
+
+Use `self.dut.shell()` for Linux filesystem, memory, and process operations.
+Use `self.dut.execute()` only when the test needs a `CommandResult` with an
+exit status.
+
 ## Extend the framework
 
 Add a class only when it owns real behavior that cannot live in an existing
