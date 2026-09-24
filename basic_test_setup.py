@@ -256,7 +256,7 @@ class BasicTestClass(UnittestTestCase):
         super().setUpClass()
         cls._initialize_log_folder()
         config_file = os.getenv("TESTCONFIG") or str(
-            Path(__file__).resolve().parents[1] / "system_tests" / "config" / "test_config.py"
+            Path(__file__).resolve().parents[1] / "config" / "test_config.py"
         )
         cls.config_file = config_file
         cls._print_test_environment()

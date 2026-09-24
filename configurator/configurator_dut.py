@@ -203,17 +203,17 @@ def load_config(path: str | Path, *, overrides: dict[str, Any] | None = None) ->
 
 
 _FACTORIES = {
-    "ssh": ("sshengine", "make_ssh_engine"),
-    "serial": ("serialengine", "make_serial_engine"),
+    "ssh": ("ssh", "make_ssh_transport"),
+    "serial": ("serial", "make_serial_transport"),
     "modbus": ("modbusengine", "make_modbus_rtu_engine"),
-    "socket": ("socket_engine", "make_socket_engine"),
-    "tcp": ("socket_engine", "make_socket_engine"),
-    "udp": ("socket_engine", "make_socket_engine"),
-    "ftp": ("ftpengine", "make_ftp_engine"),
-    "ftps": ("ftpengine", "make_ftp_engine"),
-    "http": ("httpengine", "make_http_engine"),
-    "https": ("httpengine", "make_http_engine"),
-    "websocket": ("websocket_engine", "make_websocket_engine"),
+    "socket": ("socket", "make_socket_transport"),
+    "tcp": ("socket", "make_socket_transport"),
+    "udp": ("socket", "make_socket_transport"),
+    "ftp": ("ftp", "make_ftp_client"),
+    "ftps": ("ftp", "make_ftp_client"),
+    "http": ("http", "make_http_client"),
+    "https": ("http", "make_http_client"),
+    "websocket": ("websocket", "make_websocket_client"),
 }
 _ENGINE_LOGGER_NAMES = {
     "ssh": LOGGERS.SSH_ENGINE,
@@ -264,7 +264,7 @@ class EngineFactory:
         try:
             inspect.signature(factory).bind(**options)
             if connection.protocol in {"http", "https"} and connection.protocol not in self._factories:
-                engine_type = importlib.import_module("embedded_framework.communication.httpengine").HttpEngine
+                engine_type = importlib.import_module("embedded_framework.communication.http").HttpClient
                 inspect.signature(engine_type).bind(**options)
         except TypeError:
             raise ConfigurationError(f"Invalid or missing factory options for protocol: {connection.protocol}") from None

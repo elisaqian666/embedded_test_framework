@@ -79,7 +79,6 @@ loss-tolerant byte decoding; `README.md` lists supported transports; and
 `load_mapping()` validates an in-memory mapping; `EngineFactory` maps protocol
 names to communication factories and validates their arguments before opening
 a connection. `config_labels.py` contains shared logger/protocol constants.
-`configurator_helper.py` contains legacy configuration data types.
 
 `duts/generic.py` defines `GenericDUT`: it creates configured engines
 transactionally, exposes the default or named engine with `engine()`, sends

@@ -6,22 +6,21 @@ context-manager protocol.
 
 | Module | Transport | Factory |
 | --- | --- | --- |
-| `sshengine` | SSH and SCP | `make_ssh_engine` |
-| `ftpengine` | FTP and FTPS | `make_ftp_engine` |
-| `httpengine` | HTTP and HTTPS | `make_http_engine` |
-| `serialengine` | Serial/UART | `make_serial_engine` |
-| `modbusengine` | RS-485 Modbus RTU | `make_modbus_rtu_engine` |
-| `socket_engine` | TCP and UDP sockets | `make_socket_engine` |
-| `websocket_engine` | WebSocket | `make_websocket_engine` |
+| `ssh` | SSH and SCP | `make_ssh_transport` |
+| `ftp` | FTP and FTPS | `make_ftp_client` |
+| `http` | HTTP and HTTPS | `make_http_client` |
+| `serial` | Serial/UART | `make_serial_transport` |
+| `socket` | TCP and UDP sockets | `make_socket_transport` |
+| `websocket` | WebSocket | `make_websocket_client` |
 
 The layer accepts endpoint, credential, timeout, TLS, and transport settings
 from its caller. It does not select device models, embed credentials, or parse
 product protocols.
 
 ```python
-from embedded_framework.communication.sshengine import make_ssh_engine
+from embedded_framework.communication.ssh import make_ssh_transport
 
-with make_ssh_engine("192.0.2.10", "operator", "${PASSWORD}") as ssh:
+with make_ssh_transport("192.0.2.10", "operator", "${PASSWORD}") as ssh:
     stdout, status, stderr = ssh.do_command_w_exitstatus("uname -a")
 ```
 

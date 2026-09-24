@@ -1,6 +1,9 @@
 import pytest
 
-from embedded_framework.configurator.configurator_dut import ConfigurationError, load_mapping
+from embedded_framework.configurator.configurator_dut import ConfigurationError, EngineFactory, load_mapping
+from embedded_framework.devices.linux import LinuxDevice
+from embedded_framework.devices.mcu import Stm32Device
+from embedded_framework.devices.plc import ModbusPLCDevice
 from embedded_framework.runtime import Runtime
 
 
@@ -66,9 +69,98 @@ def test_enabled_oscilloscope_connects_in_runtime(monkeypatch) -> None:
         def close(self):
             self.closed = True
 
-    monkeypatch.setattr("embedded_framework.runtime.RigolOscilloscope", Scope)
-    runtime = Runtime(load_mapping({"osciiloscope": {"model": "rigol", "enable": True, "host": "192.0.2.1"}})).connect()
+    monkeypatch.setattr("embedded_framework.runtime.Oscilloscope", Scope)
+    runtime = Runtime.from_mapping({"osciiloscope": {"model": "rigol", "enable": True, "host": "192.0.2.1"}})
 
+    assert not runtime.oscilloscope.connected
+    runtime.connect()
     assert runtime.oscilloscope.connected
     runtime.close()
     assert runtime.oscilloscope.closed
+
+
+def test_runtime_from_mapping_assembles_device_adapters_without_connecting() -> None:
+    runtime = Runtime.from_mapping(
+        {
+            "devices": {
+                "stm32": {
+                    "metadata": {"type": "stm32"},
+                    "connections": {"serial": {"protocol": "serial", "options": {"com_port": "COM1"}}},
+                },
+                "linux": {
+                    "metadata": {"type": "linux"},
+                    "connections": {"serial": {"protocol": "serial", "options": {"com_port": "COM2"}}},
+                },
+                "plc": {
+                    "metadata": {"type": "modbus_plc"},
+                    "connections": {"serial": {"protocol": "serial", "options": {"com_port": "COM3"}}},
+                },
+            }
+        }
+    )
+
+    assert isinstance(runtime.duts["stm32"], Stm32Device)
+    assert isinstance(runtime.duts["linux"], LinuxDevice)
+    assert isinstance(runtime.duts["plc"], ModbusPLCDevice)
+    assert not any(dut.is_initialized for dut in runtime.duts.values())
+
+
+def test_runtime_from_mapping_defers_transport_creation_until_connect() -> None:
+    created = []
+    opened = []
+
+    class Engine:
+        def open_serial_connection(self) -> None:
+            opened.append(True)
+
+        def close(self) -> None:
+            pass
+
+    def build(com_port: str) -> Engine:
+        created.append(com_port)
+        return Engine()
+
+    runtime = Runtime.from_mapping(
+        {"devices": {"board": {"connections": {"serial": {"protocol": "serial", "options": {"com_port": "COM1"}}}}}},
+        factory=EngineFactory({"serial": build}),
+    )
+
+    assert created == []
+    assert opened == []
+    runtime.connect()
+    assert created == ["COM1"]
+    assert opened == [True]
+    runtime.close()
+
+
+def test_runtime_rejects_any_invalid_device_before_creating_a_transport() -> None:
+    created = []
+
+    class Engine:
+        def open_serial_connection(self) -> None:
+            created.append("opened")
+
+        def close(self) -> None:
+            pass
+
+    def build(com_port: str) -> Engine:
+        created.append(com_port)
+        return Engine()
+
+    with pytest.raises(ConfigurationError, match="Invalid or missing factory options"):
+        Runtime.from_mapping(
+            {
+                "devices": {
+                    "valid": {"connections": {"serial": {"protocol": "serial", "options": {"com_port": "COM1"}}}},
+                    "invalid": {"connections": {"serial": {"protocol": "serial", "options": {}}}},
+                }
+            },
+            factory=EngineFactory({"serial": build}),
+        )
+
+    assert created == []
+
+
+def test_runtime_from_mapping_preserves_configuration_errors() -> None:
+    with pytest.raises(ConfigurationError, match="Unsupported communication protocol"):
+        Runtime.from_mapping({"devices": {"board": {"connections": {"x": {"protocol": "missing"}}}}})

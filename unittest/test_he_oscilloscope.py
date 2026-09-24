@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from embedded_framework.helpers.he_oscilloscope import RigolOscilloscope
+from embedded_framework.instruments.oscilloscope import Oscilloscope
 
 
 class _Socket:
@@ -20,10 +20,10 @@ class _Socket:
 
 def test_connect_and_run():
     connection = _Socket(b"RIGOL,DS1102Z-E,TEST,00.04\n")
-    with patch.object(RigolOscilloscope, "ping", return_value=True), patch(
-        "embedded_framework.helpers.he_oscilloscope.socket.create_connection", return_value=connection
+    with patch.object(Oscilloscope, "ping", return_value=True), patch(
+        "embedded_framework.instruments.oscilloscope.socket.create_connection", return_value=connection
     ):
-        scope = RigolOscilloscope("192.0.2.1")
+        scope = Oscilloscope("192.0.2.1")
         scope.run()
         assert connection.sent == [b"*IDN?\n", b":RUN\n"]
 
@@ -31,9 +31,9 @@ def test_connect_and_run():
 def test_save_screenshot(tmp_path):
     image = b"\x89PNG\r\n"
     connection = _Socket(b"RIGOL,DS1102Z-E,TEST,00.04\n#16" + image + b"\n")
-    with patch.object(RigolOscilloscope, "ping", return_value=True), patch(
-        "embedded_framework.helpers.he_oscilloscope.socket.create_connection", return_value=connection
+    with patch.object(Oscilloscope, "ping", return_value=True), patch(
+        "embedded_framework.instruments.oscilloscope.socket.create_connection", return_value=connection
     ):
-        target = RigolOscilloscope("192.0.2.1").save_screenshot(tmp_path / "capture.png")
+        target = Oscilloscope("192.0.2.1").save_screenshot(tmp_path / "capture.png")
         assert target.read_bytes() == image
         assert connection.sent[-1] == b":DISP:DATA? ON,OFF,PNG\n"

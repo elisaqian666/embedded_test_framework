@@ -9,23 +9,41 @@ from embedded_framework.configurator.configurator_dut import (
     load_config,
     load_mapping,
 )
-from embedded_framework.duts.generic import GenericDUT, make_dut
+from embedded_framework.devices.base import BaseDevice, DeviceFactory
 from embedded_framework.helpers.he_common import CommonHelpers
-from embedded_framework.helpers.he_oscilloscope import RigolOscilloscope
+from embedded_framework.instruments import Oscilloscope
 from embedded_framework.lib import assertion
 
 
 class Runtime:
     """Own one configuration, helper set and collection of DUTs."""
 
+    @classmethod
+    def from_mapping(
+        cls,
+        values: dict[str, Any],
+        *,
+        source: str | Path = "embedded_test_config.py",
+        factory: EngineFactory | None = None,
+        device_factory: DeviceFactory | None = None,
+    ) -> "Runtime":
+        """Validate and assemble a runtime without connecting hardware."""
+        return cls(
+            load_mapping(values, source=source),
+            factory=factory,
+            device_factory=device_factory,
+        )
+
     def __init__(
         self,
         config: FrameworkConfig,
         *,
         factory: EngineFactory | None = None,
+        device_factory: DeviceFactory | None = None,
     ) -> None:
         self.config = config
         self._factory = factory or EngineFactory()
+        self._device_factory = device_factory or DeviceFactory()
 
         # Validate every device before opening the first connection.
         for device in config.devices.values():
@@ -35,11 +53,8 @@ class Runtime:
         self.helpers = CommonHelpers()
         self.assertions = assertion
 
-        self.duts: dict[str, GenericDUT] = {
-            name: make_dut(
-                device,
-                factory=self._factory,
-            )
+        self.duts: dict[str, BaseDevice] = {
+            name: self._device_factory.create(device, self._factory)
             for name, device in config.devices.items()
         }
         self.oscilloscope = None
@@ -47,7 +62,7 @@ class Runtime:
             scope = config.oscilloscope
             if scope.model != "rigol":
                 raise ValueError(f"Unsupported oscilloscope model: {scope.model}")
-            self.oscilloscope = RigolOscilloscope(scope.host, scope.port, scope.timeout)
+            self.oscilloscope = Oscilloscope(scope.host, scope.port, scope.timeout)
 
         self._closed = False
 
@@ -123,6 +138,7 @@ def initialize(
     *,
     overrides: dict[str, Any] | None = None,
     factory: EngineFactory | None = None,
+    device_factory: DeviceFactory | None = None,
     connect: bool = True,
 ) -> Runtime:
     """Load config, prepare helpers/DUTs, and optionally open connections.
@@ -142,6 +158,7 @@ def initialize(
     runtime = Runtime(
         load_config(path, overrides=overrides),
         factory=factory,
+        device_factory=device_factory,
     )
 
     return runtime.connect() if connect else runtime
@@ -152,12 +169,15 @@ def initialize_from_mapping(
     *,
     source: str | Path = "embedded_test_config.py",
     factory: EngineFactory | None = None,
+    device_factory: DeviceFactory | None = None,
     connect: bool = True,
 ) -> Runtime:
-    """Initialize generic DUTs from a validated configuration mapping."""
-    runtime = Runtime(
-        load_mapping(values, source=source),
+    """Compatibility wrapper that preserves the legacy optional connect step."""
+    runtime = Runtime.from_mapping(
+        values,
+        source=source,
         factory=factory,
+        device_factory=device_factory,
     )
 
     return runtime.connect() if connect else runtime
