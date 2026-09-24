@@ -94,6 +94,26 @@ Use `GIVEN`, `WHEN`, and `THEN` comments in every system-test method:
 Do not add pytest markers or `pytest.ini` for these tests. Hardware that is
 not configured may skip through its test's explicit configuration rule.
 
+## Framework overview
+
+The public path is deliberately short: tests use Device or Instrument APIs;
+factories remain Runtime implementation details.
+
+```mermaid
+flowchart LR
+    TEST[Test execution] --> BASE[EmbeddedTestCase]
+    CONFIG[config/test_config.py] --> BASE
+    BASE --> RUNTIME[Runtime]
+    RUNTIME --> DEVICE[DeviceFactory → BaseDevice]
+    DEVICE --> ADAPTER[Stm32Device / LinuxDevice / ModbusPLCDevice]
+    ADAPTER --> ENGINE[EngineFactory]
+    ENGINE --> COMM[SerialTransport / SshTransport / Client]
+    COMM --> PROTOCOL[Optional protocol semantics]
+    PROTOCOL --> HARDWARE[DUT hardware]
+    RUNTIME --> INSTRUMENT[Optional Instrument]
+    INSTRUMENT --> TEST_EQUIPMENT[Oscilloscope / test equipment]
+```
+
 ## System-test call chains
 
 Every `EmbeddedTestCase` follows this framework lifecycle. `Runtime` owns all
