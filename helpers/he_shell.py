@@ -4,13 +4,13 @@ import logging
 import shlex
 from typing import Any
 
-from embedded_framework.configurator.config_labels import LOGGERS
+from embedded_test_framework.configurator.config_labels import LOGGERS
 
 import logging
 import shlex
 from typing import Any
 
-from embedded_framework.configurator.config_labels import LOGGERS
+from embedded_test_framework.configurator.config_labels import LOGGERS
 
 
 class CommandResult:

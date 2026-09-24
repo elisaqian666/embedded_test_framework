@@ -6,7 +6,7 @@ from urllib.parse import urlsplit
 import requests
 
 
-class HttpEngine:
+class HttpClient:
     """Own a reusable HTTP session with explicit authentication and TLS settings.
 
     :param base_url: Absolute HTTP(S) URL, optionally including an API prefix.
@@ -88,6 +88,8 @@ class HttpEngine:
         self.close()
 
 
-def make_http_engine(base_url: str, **kwargs: Any) -> HttpEngine:
+def make_http_client(base_url: str, **kwargs: Any) -> HttpClient:
     """Create an HTTP engine without contacting a device."""
-    return HttpEngine(base_url, **kwargs)
+    return HttpClient(base_url, **kwargs)
+
+

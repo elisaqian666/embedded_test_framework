@@ -5,7 +5,7 @@ from collections.abc import Callable, Container, Iterator
 from contextlib import contextmanager
 from typing import Any
 
-from embedded_framework.lib.timeout import (
+from embedded_test_framework.lib.timeout import (
     TimeOutError,
     TimeoutParams,
     wait_equal_timeout,
@@ -14,7 +14,7 @@ from embedded_framework.lib.timeout import (
     wait_until_in_timeout,
     wait_until_not_in_timeout,
 )
-from embedded_framework.lib.watch import DEFAULT_NO_SPAM_SLEEP
+from embedded_test_framework.lib.watch import DEFAULT_NO_SPAM_SLEEP
 
 
 def assert_equal(actual: Any, expected: Any, msg: str | None = None) -> None:

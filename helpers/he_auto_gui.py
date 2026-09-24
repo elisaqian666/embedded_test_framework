@@ -10,9 +10,9 @@ import cv2
 import numpy as np
 from retry import retry
 
-from embedded_framework.configurator.config_labels import LOGGERS
-from embedded_framework.helpers.he_image_handling import ImageHelper
-from embedded_framework.lib.basic_helper_functions import os_is_linux, os_is_macos, os_is_windows
+from embedded_test_framework.configurator.config_labels import LOGGERS
+from embedded_test_framework.helpers.he_image_handling import ImageHelper
+from embedded_test_framework.lib.basic_helper_functions import os_is_linux, os_is_macos, os_is_windows
 
 
 # noinspection PyMissingOrEmptyDocstring

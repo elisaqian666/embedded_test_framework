@@ -7,9 +7,9 @@ import re
 import socket
 import subprocess
 
-from embedded_framework.configurator.config_labels import LOGGERS
-from embedded_framework.helpers.he_host_pc import SystemHelper
-from embedded_framework.lib.timeout import TimeoutParams, wait_timeout
+from embedded_test_framework.configurator.config_labels import LOGGERS
+from embedded_test_framework.helpers.he_host_pc import SystemHelper
+from embedded_test_framework.lib.timeout import TimeoutParams, wait_timeout
 
 
 class NetworkHelper:

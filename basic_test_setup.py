@@ -8,9 +8,9 @@ from pathlib import Path
 from unittest import TestCase, SkipTest
 from typing import Dict
 
-from embedded_framework.lib.logging_extras import ascii_box_render, setup_global_logging, setup_test_log_folder
-from embedded_framework.lib.custom_exception import append_string_to_exception_message
-from embedded_framework.lib.timeout import (
+from embedded_test_framework.lib.logging_extras import ascii_box_render, setup_global_logging, setup_test_log_folder
+from embedded_test_framework.lib.custom_exception import append_string_to_exception_message
+from embedded_test_framework.lib.timeout import (
     DEFAULT_NO_SPAM_SLEEP,
     TimeOutError,
     TimeoutParams,
@@ -21,9 +21,9 @@ from embedded_framework.lib.timeout import (
     wait_timeout,
     wait_until_in_timeout,
 )
-from embedded_framework.lib.assertion import assert_equal_timeout
-from embedded_framework.lib.watch import WatchError, WatchTimeParams, watch_equal, watch_false, watch_not_equal, watch_true
-from embedded_framework.configurator.config_labels import LOGGERS
+from embedded_test_framework.lib.assertion import assert_equal_timeout
+from embedded_test_framework.lib.watch import WatchError, WatchTimeParams, watch_equal, watch_false, watch_not_equal, watch_true
+from embedded_test_framework.configurator.config_labels import LOGGERS
 
 logger = logging.getLogger(LOGGERS.TEST_CASE)
 
@@ -256,7 +256,7 @@ class BasicTestClass(UnittestTestCase):
         super().setUpClass()
         cls._initialize_log_folder()
         config_file = os.getenv("TESTCONFIG") or str(
-            Path(__file__).resolve().parents[1] / "system_tests" / "config" / "test_config.py"
+            Path(__file__).resolve().parents[1] / "config" / "test_config.py"
         )
         cls.config_file = config_file
         cls._print_test_environment()

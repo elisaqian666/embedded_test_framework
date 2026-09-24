@@ -1,10 +1,10 @@
 import pytest
 from unittest.mock import Mock, patch
 
-from embedded_framework.helpers.he_jenkins import JenkinsHelper
+from embedded_test_framework.helpers.he_jenkins import JenkinsHelper
 
 
-@patch("embedded_framework.helpers.he_jenkins.jenkins.Jenkins")
+@patch("embedded_test_framework.helpers.he_jenkins.jenkins.Jenkins")
 def test_start_build_passes_parameters_to_jenkins(jenkins_client: Mock) -> None:
     server = jenkins_client.return_value
     server.build_job.return_value = 42
@@ -15,7 +15,7 @@ def test_start_build_passes_parameters_to_jenkins(jenkins_client: Mock) -> None:
     server.build_job.assert_called_once_with("embedded-framework", parameters={"branch": "main"})
 
 
-@patch("embedded_framework.helpers.he_jenkins.jenkins.Jenkins")
+@patch("embedded_test_framework.helpers.he_jenkins.jenkins.Jenkins")
 def test_constructor_normalizes_url_and_start_build_defaults_parameters(jenkins_client: Mock) -> None:
     helper = JenkinsHelper("http://jenkins/", "ci-user", "token")
 

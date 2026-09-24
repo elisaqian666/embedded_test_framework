@@ -36,12 +36,12 @@ Not lazy about: understanding the problem (read it fully and trace the real flow
 Use this guidance when adding a transport, helper, DUT behavior, configuration,
 or test to this package. This is a reusable, product-independent framework:
 keep product models, credentials, deployment logic, and feature tests outside
-`embedded_framework`.
+`embedded_test_framework`.
 
 ### Layout
 
 ```text
-embedded_framework/
+embedded_test_framework/
 ├── communication/     Protocol transports; one engine module per protocol
 ├── configurator/      Configuration schema, validation, and engine selection
 ├── duts/              Generic DUT composition and connection lifecycle
@@ -79,7 +79,6 @@ loss-tolerant byte decoding; `README.md` lists supported transports; and
 `load_mapping()` validates an in-memory mapping; `EngineFactory` maps protocol
 names to communication factories and validates their arguments before opening
 a connection. `config_labels.py` contains shared logger/protocol constants.
-`configurator_helper.py` contains legacy configuration data types.
 
 `duts/generic.py` defines `GenericDUT`: it creates configured engines
 transactionally, exposes the default or named engine with `engine()`, sends
@@ -154,7 +153,7 @@ checks or real-device tests under `system_tests/` as appropriate.
 ### Running tests
 
 Run framework unit tests from the repository root with `python -m pytest
-embedded_framework/unittest -q`. Run an individual system test with `python
+embedded_test_framework/unittest -q`. Run an individual system test with `python
 -m pytest system_tests/test_examples/test_ssh_command.py -q`; set
 `TESTCONFIG` to choose a different Python configuration module. Hardware tests
 must not be run until the configured endpoint, credentials, and physical
