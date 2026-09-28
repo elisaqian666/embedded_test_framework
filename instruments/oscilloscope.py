@@ -1,4 +1,4 @@
-"""LAN/SCPI control for a RIGOL DS1102Z-E oscilloscope."""
+"""LAN/SCPI control for a RIGOL oscilloscope."""
 
 import platform
 import socket
@@ -7,14 +7,14 @@ from pathlib import Path
 
 
 class Oscilloscope:
-    """Control a RIGOL DS1102Z-E through its SCPI TCP service."""
+    """Control a RIGOL oscilloscope through its SCPI TCP service."""
 
     MODEL = "DS1102Z-E"
 
-    def __init__(self, host: str, port: int = 5555, timeout: float = 5) -> None:
-        if not host or not 1 <= port <= 65535 or timeout <= 0:
-            raise ValueError("host, port (1..65535), and timeout must be valid")
-        self.host, self.port, self.timeout = host, port, timeout
+    def __init__(self, host: str, port: int = 5555, timeout: float = 5, model: str = MODEL) -> None:
+        if not host or not 1 <= port <= 65535 or timeout <= 0 or not model:
+            raise ValueError("host, port (1..65535), timeout, and model must be valid")
+        self.host, self.port, self.timeout, self.model = host, port, timeout, model.upper()
         self._socket: socket.socket | None = None
         self._buffer = bytearray()
 
@@ -23,15 +23,16 @@ class Oscilloscope:
         return subprocess.run(["ping", flag, "1", self.host], capture_output=True, timeout=self.timeout).returncode == 0
 
     def connect(self, *, check_ping: bool = True) -> None:
-        """Connect and verify the expected RIGOL model with ``*IDN?``."""
+        """Connect and verify the configured RIGOL model with ``*IDN?``."""
         if self._socket is not None:
             return
         if check_ping and not self.ping():
             raise ConnectionError(f"Oscilloscope does not respond to ping: {self.host}")
         self._socket = socket.create_connection((self.host, self.port), self.timeout)
         try:
-            if self.MODEL not in self._query_connected("*IDN?").upper():
-                raise ConnectionError(f"Expected RIGOL {self.MODEL}")
+            identity = self._query_connected("*IDN?").upper()
+            if "RIGOL" not in identity or self.model not in identity:
+                raise ConnectionError(f"Expected RIGOL {self.model}; received {identity}")
         except BaseException:
             self.close()
             raise

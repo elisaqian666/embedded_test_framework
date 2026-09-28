@@ -28,6 +28,14 @@ def test_connect_and_run():
         assert connection.sent == [b"*IDN?\n", b":RUN\n"]
 
 
+def test_connect_uses_configured_model():
+    connection = _Socket(b"RIGOL TECHNOLOGIES,DS1202Z-E,TEST,00.06\n")
+    with patch.object(Oscilloscope, "ping", return_value=True), patch(
+        "embedded_test_framework.instruments.oscilloscope.socket.create_connection", return_value=connection
+    ):
+        Oscilloscope("192.0.2.1", model="DS1202Z-E").connect()
+
+
 def test_save_screenshot(tmp_path):
     image = b"\x89PNG\r\n"
     connection = _Socket(b"RIGOL,DS1102Z-E,TEST,00.04\n#16" + image + b"\n")
