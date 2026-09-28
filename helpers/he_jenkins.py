@@ -5,7 +5,7 @@ from typing import Any
 
 import jenkins
 
-from embedded_framework.lib.custom_exception import EmbeddedFrameworkException
+from embedded_test_framework.lib.custom_exception import EmbeddedFrameworkException
 
 
 class JenkinsHelperError(EmbeddedFrameworkException):

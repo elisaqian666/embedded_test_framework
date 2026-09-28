@@ -1,8 +1,8 @@
 import logging
 from pathlib import Path
 
-from embedded_framework.basic_test_setup import BasicTestClass
-import embedded_framework.lib.logging_extras as logging_extras
+from embedded_test_framework.basic_test_setup import BasicTestClass
+import embedded_test_framework.lib.logging_extras as logging_extras
 
 
 def test_setup_creates_one_timestamped_log_folder(tmp_path, monkeypatch):

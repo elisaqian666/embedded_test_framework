@@ -6,7 +6,7 @@ import ctypes
 import time
 from ctypes import wintypes
 from pathlib import Path
-from embedded_framework.helpers.he_host_pc import SystemHelper
+from embedded_test_framework.helpers.he_host_pc import SystemHelper
 
 
 class FileHelper:

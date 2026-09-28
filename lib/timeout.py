@@ -5,9 +5,9 @@ import time
 from collections import namedtuple
 from contextlib import suppress
 
-from embedded_framework.lib.basic_helper_functions import get_parent_that_defined_method, listify
-from embedded_framework.lib.custom_exception import EmbeddedFrameworkException
-from embedded_framework.lib.timer import Timer
+from embedded_test_framework.lib.basic_helper_functions import get_parent_that_defined_method, listify
+from embedded_test_framework.lib.custom_exception import EmbeddedFrameworkException
+from embedded_test_framework.lib.timer import Timer
 
 logger = logging.getLogger("timeout")
 

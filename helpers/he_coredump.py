@@ -3,8 +3,8 @@
 import shlex
 import logging
 from collections.abc import Callable
-from embedded_framework.configurator.config_labels import LOGGERS
-from embedded_framework.helpers.he_shell import CommandResult
+from embedded_test_framework.configurator.config_labels import LOGGERS
+from embedded_test_framework.helpers.he_shell import CommandResult
 
 
 class CoreDumpHelper:

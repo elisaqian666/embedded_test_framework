@@ -34,7 +34,7 @@ requires = ["setuptools>=70", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["embedded_framework*"]
+include = ["embedded_test_framework*"]
 
 [tool.black]
 line-length = 140

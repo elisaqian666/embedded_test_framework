@@ -4,9 +4,9 @@ import logging
 import time
 from collections import namedtuple
 
-from embedded_framework.lib.basic_helper_functions import get_parent_that_defined_method
-from embedded_framework.lib.custom_exception import EmbeddedFrameworkException
-from embedded_framework.lib.timer import Timer
+from embedded_test_framework.lib.basic_helper_functions import get_parent_that_defined_method
+from embedded_test_framework.lib.custom_exception import EmbeddedFrameworkException
+from embedded_test_framework.lib.timer import Timer
 
 DEFAULT_WATCH_TIME = 0
 DEFAULT_FAIL_MSG = None

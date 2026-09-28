@@ -19,7 +19,7 @@ from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import Any
 
-from embedded_framework.configurator.config_labels import LOGGERS
+from embedded_test_framework.configurator.config_labels import LOGGERS
 
 
 class ContentHandler:
