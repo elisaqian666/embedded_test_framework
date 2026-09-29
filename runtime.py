@@ -60,9 +60,7 @@ class Runtime:
         self.oscilloscope = None
         if config.oscilloscope and config.oscilloscope.enable:
             scope = config.oscilloscope
-            if scope.model != "rigol":
-                raise ValueError(f"Unsupported oscilloscope model: {scope.model}")
-            self.oscilloscope = Oscilloscope(scope.host, scope.port, scope.timeout)
+            self.oscilloscope = Oscilloscope(scope.host, scope.port, scope.timeout, scope.model)
 
         self._closed = False
 
