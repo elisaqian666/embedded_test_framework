@@ -8,6 +8,7 @@ from pathlib import Path
 class MetaConst(type):
     __test__ = None
 
+
 class Const(object, metaclass=MetaConst):
     """Base class for constant enumerations."""
 
@@ -39,6 +40,7 @@ class ENGINES(Const):
     FTPS = "ftps"
     SFTP = "sftp"
 
+
 class LOGLEVELS(Const):
 
     DEBUG = "debug"
@@ -46,6 +48,7 @@ class LOGLEVELS(Const):
     WARNING = "warning"
     ERROR = "error"
     CRITICAL = "critical"
+
 
 class PORTS(Const):
 
@@ -59,8 +62,10 @@ class PORTS(Const):
     QEMU_SSH = 2200
     REST = 4003
 
+
 class LOGGERS(Const):
 
+    MQTT = "mqtt"
     ADB = "adb"
     APPIUM = "appium"
     CONFIG = "config"
@@ -83,4 +88,3 @@ class LOGGERS(Const):
     SERIAL_ENGINE = "serial_engine"
     SOCKET_ENGINE = "socket_engine"
     WEBSOCKET_ENGINE = "websocket_engine"
-    

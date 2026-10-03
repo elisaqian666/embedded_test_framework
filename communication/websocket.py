@@ -101,9 +101,7 @@ class WebSocketClient(object):
 def wait_for_web_socket_creation(url):
     """wait until a websocket is created"""
     timeout_param = embedded_test_framework.lib.timeout.TimeoutParams(
-        timeout=150,
-        timeout_msg=f"Not able to connect to websocket on {url}",
-        no_spam_sleep=1,
+        timeout=150, timeout_msg=f"Not able to connect to websocket on {url}", no_spam_sleep=1
     )
     return embedded_test_framework.lib.timeout.wait_no_exception_timeout(create_and_connect_to_websocket, timeout_param, Exception, url)
 
@@ -129,5 +127,3 @@ def make_websocket_client(url):
     logging.getLogger("websocket").info("creating websocket engine on url %s", url)
     ws = wait_for_web_socket_creation(url)
     return WebSocketClient(ws)
-
-

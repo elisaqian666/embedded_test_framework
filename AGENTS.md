@@ -85,8 +85,13 @@ transactionally, exposes the default or named engine with `engine()`, sends
 shell commands through `execute()` where supported, and closes engines in
 reverse order. `duts/__init__.py` is package metadata only.
 
-`helpers/` contains no product policy. `he_common.py` composes common file,
-host, network, and system helpers. `he_host_pc.py` handles processes, files,
+Device `metadata.type` identifies the DUT family. A configured protocol adds a
+capability only when that adapter declares it in `connection_capabilities`. A
+STM32 or Linux DUT may expose MQTT alongside serial or SSH, so do not create a
+separate MQTT-only device type for an existing DUT.
+
+`helpers/` contains no product policy. Tests import the specific helper they
+need. `he_host_pc.py` handles processes, files,
 screenshots, archives, and Windows facilities; `he_network.py` handles host
 network queries; `he_file.py` handles local/removable-media files;
 `he_shell.py` normalizes command results; `he_auto_gui.py` automates desktop
@@ -127,12 +132,14 @@ checks or real-device tests under `system_tests/` as appropriate.
    device is contacted. It creates one `GenericDUT` per configured device.
 5. `Runtime.connect()` calls each DUT's `connect()`. The DUT validates again,
    asks `EngineFactory` to import the selected communication module and call
-   its `make_*_engine`, then stores engines by connection alias. Any failure
-   closes already-opened resources.
+   its `make_*_engine` for required connections, then stores engines by
+   connection alias. Connections default to required; `required: false` is
+   validated during setup and opens only at the first `engine(name)` call. Any
+   failure closes already-opened resources.
 6. The test uses `self.dut.execute()` only for command-capable transports
    (such as SSH), `self.dut.engine()` for protocol-specific APIs, and
-   `self.runtime.helpers` / `self.dut.helpers` for host utilities. Assert with
-   the framework assertion helpers or inherited unittest-style methods.
+   directly imported host utilities. Assert with the framework assertion
+   helpers or inherited unittest-style methods.
 7. `EmbeddedTestCase.tearDownClass()` closes the `Runtime`; each DUT closes
    engines in reverse initialization order. Cleanup failures are retained as
    an exception group instead of leaking later connections.

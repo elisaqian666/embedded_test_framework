@@ -5,8 +5,8 @@ with embedded devices and initializing generic devices under test (DUTs).
 
 It provides:
 
-- communication clients for SSH, FTP/FTPS, HTTP/HTTPS, TCP/UDP sockets,
-  serial ports, and WebSocket;
+- communication clients for ADB, MQTT, SSH, FTP/FTPS, HTTP/HTTPS, TCP/UDP
+  sockets, serial ports, and WebSocket;
 - configuration loading from JSON or TOML, with environment-variable
   substitution;
 - configuration-driven connection creation and DUT lifecycle management;
@@ -44,6 +44,11 @@ operations, such as `Stm32Device.serial()` or Modbus PLC register access.
 
 See [the communication package](communication/README.md) for the
 transport interfaces and connection configuration fields.
+
+Connections are required by default and open during `Runtime.connect()`. Set
+`"required": false` for an optional connection (for example MQTT on a Linux
+DUT); it is validated during setup but opens only when `device.engine("mqtt")`
+or the adapter API first uses it.
 
 ## System-test example
 
@@ -92,7 +97,23 @@ Use `GIVEN`, `WHEN`, and `THEN` comments in every system-test method:
 - **THEN**: observable assertions.
 
 Do not add pytest markers or `pytest.ini` for these tests. Hardware that is
-not configured may skip through its test's explicit configuration rule.
+not configured must use a `TESTCONFIG` that defines its required connections
+and capabilities.
+
+```python
+config = {
+    "devices": {
+        "linux_dut": {
+            "metadata": {"type": "linux"},
+            "default_connection": "ssh",
+            "connections": {
+                "ssh": {"protocol": "ssh", "options": {"address": "192.0.2.10", "username": "operator", "password": "${SSH_PASSWORD}"}},
+                "mqtt": {"protocol": "mqtt", "required": False, "options": {"host": "192.0.2.20"}},
+            },
+        }
+    }
+}
+```
 
 ## Framework overview
 
@@ -128,8 +149,8 @@ flowchart TD
     R --> D[DeviceFactory\nmetadata.type selects Device]
     D --> C[Runtime.connect]
     C --> BD[BaseDevice.connect]
-    BD --> EF[EngineFactory.create\nvalidate and build connection]
-    EF --> H[Transport / hardware]
+    BD --> EF[EngineFactory.create\nrequired connections]
+    EF --> H[Transport / hardware\noptional on first engine use]
     H --> T[Test method uses self.dut or self.engine]
     T --> X[EmbeddedTestCase.tearDownClass]
     X --> RC[Runtime.close → BaseDevice.close → Transport.close]
@@ -200,15 +221,22 @@ not define connection settings.
 ### Add a device
 
 1. Add a `BaseDevice` subclass under the appropriate `devices/` category.
-   Declare its `capabilities` and expose only the APIs matching those
-   capabilities. For example, an STM32 adapter exposes `serial()`; it does not
+   Declare its static `capabilities` and expose only the APIs matching those
+   capabilities. Declare protocol-derived capabilities in
+   `connection_capabilities`; they are available only when that protocol is
+   configured. For example, an STM32 adapter exposes `serial()`; it does not
    inherit Linux shell methods.
 2. Add exactly one `metadata.type` entry to `DeviceFactory` in
    `devices/base.py`. `generic` remains the default for configurations that do
    not need a device-specific adapter.
 3. Set that type in `config/test_config.py`, then add a small unit test for
-   factory selection and the device API. Keep hardware checks in a skippable
-   system test when no configured target is available.
+   factory selection and the device API. Run hardware checks with a
+   `TESTCONFIG` that defines the target's required connections.
+
+`metadata.type` identifies the DUT family. A configured protocol adds a
+capability only when that adapter declares it in `connection_capabilities`.
+A `stm32` or `linux` DUT may expose MQTT alongside serial or SSH, so do not
+create a separate MQTT-only device type for an existing DUT.
 
 ### Add an engine
 

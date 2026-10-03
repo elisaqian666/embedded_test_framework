@@ -164,15 +164,7 @@ class SerialTransport(BaseTransport):
         self.logger.info("Serial connection closed on port: %s", self.port)
 
 
-def make_serial_transport(
-    com_port,
-    baudrate=9600,
-    read_timeout=1.0,
-    write_timeout=10,
-    bytesize=8,
-    parity="N",
-    stopbits=1,
-):
+def make_serial_transport(com_port, baudrate=9600, read_timeout=1.0, write_timeout=10, bytesize=8, parity="N", stopbits=1):
     """
     make serial port
 
@@ -184,11 +176,5 @@ def make_serial_transport(
     logging.getLogger("serial").info("creating the serial engine on port: %s", com_port)
     if not hasattr(serial, "Serial"):
         raise ImportError("pyserial is required to create a serial transport")
-    ser = serial.Serial(
-        timeout=read_timeout,
-        write_timeout=write_timeout,
-        bytesize=bytesize,
-        parity=parity,
-        stopbits=stopbits,
-    )
+    ser = serial.Serial(timeout=read_timeout, write_timeout=write_timeout, bytesize=bytesize, parity=parity, stopbits=stopbits)
     return SerialTransport(ser, com_port, baudrate, read_timeout)

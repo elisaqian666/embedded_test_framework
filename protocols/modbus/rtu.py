@@ -1,10 +1,9 @@
 """Modbus RTU framing over an injected byte transport."""
 
 from embedded_test_framework.communication.base import BaseTransport
-from embedded_test_framework.protocols.modbus.base import BaseModbusProtocol
 
 
-class ModbusRTUProtocol(BaseModbusProtocol):
+class ModbusRTUProtocol:
     def __init__(self, transport: BaseTransport, slave_id: int) -> None:
         if not 1 <= slave_id <= 247:
             raise ValueError("slave_id must be 1..247")

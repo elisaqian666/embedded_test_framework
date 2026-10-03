@@ -6,6 +6,8 @@ context-manager protocol.
 
 | Module | Transport | Factory |
 | --- | --- | --- |
+| `adb` | Android Debug Bridge | `make_adb_client` |
+| `mqtt` | MQTT broker client | `make_mqtt_client` |
 | `ssh` | SSH and SCP | `make_ssh_transport` |
 | `ftp` | FTP and FTPS | `make_ftp_client` |
 | `http` | HTTP and HTTPS | `make_http_client` |

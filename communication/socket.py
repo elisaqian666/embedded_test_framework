@@ -249,5 +249,3 @@ def make_socket_transport(host, port, family=socket.AF_INET, s_type=socket.SOCK_
         client.close()
         raise
     return client
-
-

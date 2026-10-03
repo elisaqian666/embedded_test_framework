@@ -15,12 +15,7 @@ class JenkinsHelperError(EmbeddedFrameworkException):
 class JenkinsHelper:
     """Small wrapper around python-jenkins for job, build and node operations."""
 
-    def __init__(
-        self,
-        url: str,
-        username: str,
-        token: str,
-    ) -> None:
+    def __init__(self, url: str, username: str, token: str) -> None:
         if not url:
             raise ValueError("Jenkins URL must not be empty")
         if not username:
@@ -28,94 +23,48 @@ class JenkinsHelper:
         if not token:
             raise ValueError("Jenkins token must not be empty")
 
-        self.server = jenkins.Jenkins(
-            url.rstrip("/"),
-            username=username,
-            password=token,
-        )
+        self.server = jenkins.Jenkins(url.rstrip("/"), username=username, password=token)
 
     def get_version(self) -> str:
         """Return Jenkins server version."""
         return self.server.get_version()
 
-    def start_build(
-        self,
-        job_name: str,
-        parameters: dict[str, Any] | None = None,
-    ) -> int:
+    def start_build(self, job_name: str, parameters: dict[str, Any] | None = None) -> int:
         """Queue a Jenkins job and return its queue item id."""
-        return self.server.build_job(
-            job_name,
-            parameters=parameters or {},
-        )
+        return self.server.build_job(job_name, parameters=parameters or {})
 
-    def stop_build(
-        self,
-        job_name: str,
-        build_number: int,
-    ) -> None:
+    def stop_build(self, job_name: str, build_number: int) -> None:
         """Stop a running build."""
-        self.server.stop_build(
-            job_name,
-            build_number,
-        )
+        self.server.stop_build(job_name, build_number)
 
     def get_job_info(self, job_name: str) -> dict[str, Any]:
         """Return Jenkins job information."""
         return self.server.get_job_info(job_name)
 
-    def get_build_info(
-        self,
-        job_name: str,
-        build_number: int,
-    ) -> dict[str, Any]:
+    def get_build_info(self, job_name: str, build_number: int) -> dict[str, Any]:
         """Return Jenkins build information."""
-        return self.server.get_build_info(
-            job_name,
-            build_number,
-        )
+        return self.server.get_build_info(job_name, build_number)
 
     def get_last_build_number(self, job_name: str) -> int | None:
         """Return the latest build number, or None if the job has never run."""
         last_build = self.get_job_info(job_name).get("lastBuild")
         return last_build["number"] if last_build else None
 
-    def get_last_successful_build_number(
-        self,
-        job_name: str,
-    ) -> int | None:
+    def get_last_successful_build_number(self, job_name: str) -> int | None:
         """Return the last successful build number."""
-        build = self.get_job_info(job_name).get(
-            "lastSuccessfulBuild"
-        )
+        build = self.get_job_info(job_name).get("lastSuccessfulBuild")
         return build["number"] if build else None
 
-    def is_build_running(
-        self,
-        job_name: str,
-        build_number: int,
-    ) -> bool:
+    def is_build_running(self, job_name: str, build_number: int) -> bool:
         """Return whether a build is currently running."""
-        return bool(
-            self.get_build_info(
-                job_name,
-                build_number,
-            ).get("building")
-        )
+        return bool(self.get_build_info(job_name, build_number).get("building"))
 
-    def get_build_result(
-        self,
-        job_name: str,
-        build_number: int,
-    ) -> str | None:
+    def get_build_result(self, job_name: str, build_number: int) -> str | None:
         """Return build result such as SUCCESS, FAILURE or ABORTED.
 
         None usually means the build is still running.
         """
-        return self.get_build_info(
-            job_name,
-            build_number,
-        ).get("result")
+        return self.get_build_info(job_name, build_number).get("result")
 
     def get_queue(self) -> list[dict[str, Any]]:
         """Return current Jenkins queue."""
@@ -135,20 +84,13 @@ class JenkinsHelper:
 
     def is_node_online(self, node_name: str) -> bool:
         """Return whether a Jenkins node is online."""
-        return not self.get_node_info(node_name).get(
-            "offline",
-            True,
-        )
+        return not self.get_node_info(node_name).get("offline", True)
 
     def get_node_labels(self, node_name: str) -> list[str]:
         """Return labels assigned to a Jenkins node."""
         node = self.get_node_info(node_name)
 
-        return [
-            label["name"]
-            for label in node.get("assignedLabels", [])
-            if label.get("name")
-        ]
+        return [label["name"] for label in node.get("assignedLabels", []) if label.get("name")]
 
     @staticmethod
     def current_job_name() -> str | None:
@@ -179,9 +121,6 @@ class JenkinsHelper:
 
 if __name__ == "__main__":
     # Small self-check that does not require a Jenkins server.
-    assert JenkinsHelper.current_node_labels() == os.getenv(
-        "NODE_LABELS",
-        "",
-    ).split()
+    assert JenkinsHelper.current_node_labels() == os.getenv("NODE_LABELS", "").split()
 
     print("self-check passed")

@@ -302,9 +302,7 @@ class SshTransport(BaseTransport):
             stdout, exit_status, stderr = self._ssh_exec_command_w_timeout(command, time_out)
         except (OSError, AuthenticationException, SSHException, *re_init_exceptions) as excep:
             self.logger.error(
-                "Exception caught after opening session in _do_command: %s - %s, re-initialize the engine",
-                str(type(excep)),
-                str(excep),
+                "Exception caught after opening session in _do_command: %s - %s, re-initialize the engine", str(type(excep)), str(excep)
             )
 
             self.__re_init__()
@@ -538,11 +536,7 @@ class SSHForwardRequestHandler(socketserver.BaseRequestHandler):
             self.request.close()
 
     def _get_ssh_channel(self):
-        channel = self.ssh_transport.open_channel(
-            "direct-tcpip",
-            (self.dest_address, self.dest_port),
-            self.request.getpeername(),
-        )
+        channel = self.ssh_transport.open_channel("direct-tcpip", (self.dest_address, self.dest_port), self.request.getpeername())
 
         self.logger.debug(
             "SSH tunnel opened successfully %r -> %r -> %r",
@@ -683,4 +677,3 @@ def make_ssh_transport(address: str, username: str, password: str, port: int = 2
     """
     connection = create_ssh_session_obj_from_hostname(address, username, password, port, retry, timeout)
     return SshTransport(connection, address, username, password, port)
-

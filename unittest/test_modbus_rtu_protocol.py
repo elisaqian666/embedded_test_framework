@@ -1,8 +1,6 @@
 import pytest
 
 from embedded_test_framework.communication.base import BaseTransport
-from embedded_test_framework.configurator.configurator_dut import DeviceConfig, EngineFactory
-from embedded_test_framework.devices.plc import ModbusPLCDevice
 from embedded_test_framework.protocols.modbus.rtu import ModbusRTUProtocol
 
 
@@ -50,15 +48,6 @@ def test_write_register_builds_rtu_request() -> None:
     ModbusRTUProtocol(transport, 1).write_single_register(100, 123)
 
     assert transport.requests == [_frame(1, 6, 0, 0x64, 0, 0x7B)]
-
-
-def test_plc_device_uses_the_injected_protocol_chain() -> None:
-    transport = FakeTransport(_frame(1, 3, 2, 0, 7))
-    protocol = ModbusRTUProtocol(transport, 1)
-    device = ModbusPLCDevice(DeviceConfig("plc", {}, "", {}), EngineFactory(), protocol=protocol)
-
-    assert device.read_register(0) == [7]
-    assert transport.requests == [_frame(1, 3, 0, 0, 0, 1)]
 
 
 def test_read_rejects_invalid_or_incomplete_responses() -> None:

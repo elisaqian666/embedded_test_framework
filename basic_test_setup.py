@@ -1,4 +1,3 @@
-
 import logging
 import pytest
 import os
@@ -234,7 +233,6 @@ class BasicTestClass(UnittestTestCase):
 
     logger = logging.getLogger(LOGGERS.TEST_CASE)
 
-   
     dut_in_test_dict: Dict | None = None
     # overrule setup parameter: dictionary setup key, {'enable_..': False}
     overrule_settings = None
@@ -249,15 +247,13 @@ class BasicTestClass(UnittestTestCase):
         if not _LOG_INITIALIZED:
             setup_global_logging(logging.INFO)
             _LOG_INITIALIZED = True
-        super().__init_subclass__(*args,** kwargs)
+        super().__init_subclass__(*args, **kwargs)
 
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         cls._initialize_log_folder()
-        config_file = os.getenv("TESTCONFIG") or str(
-            Path(__file__).resolve().parents[1] / "config" / "test_config.py"
-        )
+        config_file = os.getenv("TESTCONFIG") or str(Path(__file__).resolve().parents[1] / "config" / "test_config.py")
         cls.config_file = config_file
         cls._print_test_environment()
         cls.logger.info("opening %s as config file", cls.config_file)
@@ -332,9 +328,7 @@ class BasicTestClass(UnittestTestCase):
 
     @classmethod
     @deprecation.deprecated(
-        deprecated_in="1.9.0",
-        removed_in="1.10.0",
-        details="use 'assert_equal_timeout' from TEnTo.lib.assertion instead of this method",
+        deprecated_in="1.9.0", removed_in="1.10.0", details="use 'assert_equal_timeout' from TEnTo.lib.assertion instead of this method"
     )
     def assertEqualTimeOut(
         cls, func_which_should_evaluate_to_value, value, *args, timeout=0, msg=None, interval=DEFAULT_NO_SPAM_SLEEP, **kwargs
