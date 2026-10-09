@@ -236,12 +236,7 @@ class FtpClient:
         file_path = os.path.join(local_path, file_name)
 
         if self.is_path_a_directory(ftp_path):
-            self._download_ftp_dir(
-                ftp_path,
-                file_path,
-                pattern=pattern,
-                overwrite=overwrite,
-            )
+            self._download_ftp_dir(ftp_path, file_path, pattern=pattern, overwrite=overwrite)
         else:
             file_retr = f"RETR {ftp_path}"
             if not os.path.exists(file_path) or overwrite is True:
@@ -906,5 +901,3 @@ def make_ftp_client(  # noqa: PLR0913 - explicit protocol connection settings
     except Exception:
         session.close()
         raise
-
-

@@ -17,13 +17,7 @@ class HttpClient:
     """
 
     def __init__(
-        self,
-        base_url: str,
-        *,
-        timeout: float = 20,
-        auth: Any = None,
-        verify: bool | str = True,
-        headers: dict[str, str] | None = None,
+        self, base_url: str, *, timeout: float = 20, auth: Any = None, verify: bool | str = True, headers: dict[str, str] | None = None
     ) -> None:
         parsed = urlsplit(base_url)
         if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.query or parsed.fragment:
@@ -91,5 +85,3 @@ class HttpClient:
 def make_http_client(base_url: str, **kwargs: Any) -> HttpClient:
     """Create an HTTP engine without contacting a device."""
     return HttpClient(base_url, **kwargs)
-
-

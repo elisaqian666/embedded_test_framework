@@ -4,7 +4,6 @@ from enum import StrEnum
 from typing import Any, Self
 
 from embedded_test_framework.configurator.configurator_dut import DeviceConfig, EngineFactory
-from embedded_test_framework.helpers.he_common import CommonHelpers
 from embedded_test_framework.lib.custom_exception import EmbeddedFrameworkException
 
 
@@ -13,28 +12,33 @@ class DeviceStateError(EmbeddedFrameworkException):
 
 
 class Capability(StrEnum):
+    MQTT = "mqtt"
     MODBUS = "modbus"
     REGISTER_IO = "register_io"
     DIGITAL_IO = "digital_io"
     SERIAL = "serial"
     SHELL = "shell"
+    ADB = "adb"
 
 
 class BaseDevice:
     """Own configured transports and expose common device operations."""
 
     capabilities: frozenset[Capability] = frozenset()
+    connection_capabilities: dict[Capability, frozenset[str]] = {}
 
     def __init__(self, config: DeviceConfig, factory: EngineFactory) -> None:
         self.config = config
         self.name = config.name
-        self.helpers = CommonHelpers()
         self._factory = factory
         self._engines: dict[str, Any] = {}
         self._connected = False
 
     def supports(self, capability: Capability) -> bool:
-        return capability in self.capabilities
+        return capability in self.capabilities or any(
+            connection.protocol in self.connection_capabilities.get(capability, ())
+            for connection in self.config.connections.values()
+        )
 
     def require(self, capability: Capability) -> None:
         if not self.supports(capability):
@@ -51,7 +55,8 @@ class BaseDevice:
             raise DeviceStateError("Previous cleanup failed; close the DUT before reconnecting")
         try:
             for name, connection in self.config.connections.items():
-                self._engines[name] = self._factory.create(connection)
+                if connection.required:
+                    self._engines[name] = self._factory.create(connection)
             self._connected = True
         except BaseException as error:
             try:
@@ -64,7 +69,10 @@ class BaseDevice:
     def engine(self, name: str | None = None) -> Any:
         if not self._connected:
             raise DeviceStateError(f"DUT {self.name} is not initialized")
-        return self._engines[name or self.config.default_connection]
+        name = name or self.config.default_connection
+        if name not in self._engines:
+            self._engines[name] = self._factory.create(self.config.connections[name])
+        return self._engines[name]
 
     def close(self) -> None:
         self._connected = False
@@ -95,11 +103,18 @@ class DeviceFactory:
     """Select a device adapter from ``devices.<name>.metadata.type``."""
 
     def __init__(self, adapters: dict[str, type[BaseDevice]] | None = None) -> None:
+        from embedded_test_framework.devices.android.android_device import AndroidDevice
         from embedded_test_framework.devices.linux.linux_device import LinuxDevice
         from embedded_test_framework.devices.mcu.stm32 import Stm32Device
         from embedded_test_framework.devices.plc.modbus_plc import ModbusPLCDevice
 
-        self._adapters = {"generic": BaseDevice, "linux": LinuxDevice, "modbus_plc": ModbusPLCDevice, "stm32": Stm32Device}
+        self._adapters = {
+            "android": AndroidDevice,
+            "generic": BaseDevice,
+            "linux": LinuxDevice,
+            "modbus_plc": ModbusPLCDevice,
+            "stm32": Stm32Device,
+        }
         self._adapters.update(adapters or {})
 
     def create(self, config: DeviceConfig, factory: EngineFactory) -> BaseDevice:

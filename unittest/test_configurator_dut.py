@@ -1,6 +1,7 @@
 import pytest
 
 from embedded_test_framework.configurator.configurator_dut import ConfigurationError, EngineFactory, load_mapping
+from embedded_test_framework.devices.android import AndroidDevice
 from embedded_test_framework.devices.linux import LinuxDevice
 from embedded_test_framework.devices.mcu import Stm32Device
 from embedded_test_framework.devices.plc import ModbusPLCDevice
@@ -26,27 +27,15 @@ def test_mapping_expands_environment_for_each_device(monkeypatch) -> None:
 def test_mapping_rejects_missing_environment_variable() -> None:
     with pytest.raises(ConfigurationError, match="REQUIRED_HOST"):
         load_mapping(
-            {
-                "devices": {
-                    "device": {
-                        "connections": {"http": {"protocol": "http", "options": {"base_url": "http://${REQUIRED_HOST}"}}}
-                    }
-                }
-            }
+            {"devices": {"device": {"connections": {"http": {"protocol": "http", "options": {"base_url": "http://${REQUIRED_HOST}"}}}}}}
         )
+
+
 def test_mapping_merges_overrides_before_expanding_environment(monkeypatch) -> None:
     monkeypatch.setenv("DEVICE_HOST", "192.168.1.10")
     config = load_mapping(
-        {
-            "devices": {
-                "device": {"connections": {"http": {"protocol": "http", "options": {"base_url": "http://old"}}}}
-            }
-        },
-        overrides={
-            "devices": {
-                "device": {"connections": {"http": {"options": {"base_url": "http://${DEVICE_HOST}"}}}}
-            }
-        },
+        {"devices": {"device": {"connections": {"http": {"protocol": "http", "options": {"base_url": "http://old"}}}}}},
+        overrides={"devices": {"device": {"connections": {"http": {"options": {"base_url": "http://${DEVICE_HOST}"}}}}}},
     )
 
     assert config.devices["device"].connections["http"].options["base_url"] == "http://192.168.1.10"
@@ -83,6 +72,10 @@ def test_runtime_from_mapping_assembles_device_adapters_without_connecting() -> 
     runtime = Runtime.from_mapping(
         {
             "devices": {
+                "android": {
+                    "metadata": {"type": "android"},
+                    "connections": {"adb": {"protocol": "adb", "options": {"serial": "emulator-5554"}}},
+                },
                 "stm32": {
                     "metadata": {"type": "stm32"},
                     "connections": {"serial": {"protocol": "serial", "options": {"com_port": "COM1"}}},
@@ -99,6 +92,7 @@ def test_runtime_from_mapping_assembles_device_adapters_without_connecting() -> 
         }
     )
 
+    assert isinstance(runtime.duts["android"], AndroidDevice)
     assert isinstance(runtime.duts["stm32"], Stm32Device)
     assert isinstance(runtime.duts["linux"], LinuxDevice)
     assert isinstance(runtime.duts["plc"], ModbusPLCDevice)
@@ -131,6 +125,50 @@ def test_runtime_from_mapping_defers_transport_creation_until_connect() -> None:
     assert created == ["COM1"]
     assert opened == [True]
     runtime.close()
+
+
+def test_optional_connection_is_created_on_first_use() -> None:
+    created = []
+
+    class Engine:
+        def open_serial_connection(self) -> None:
+            pass
+
+        def close(self) -> None:
+            pass
+
+    def build_serial(com_port: str) -> Engine:
+        created.append(com_port)
+        return Engine()
+
+    def build_mqtt() -> Engine:
+        created.append("mqtt")
+        return Engine()
+
+    runtime = Runtime.from_mapping(
+        {
+            "devices": {
+                "board": {
+                    "connections": {
+                        "serial": {"protocol": "serial", "options": {"com_port": "COM1"}},
+                        "mqtt": {"protocol": "mqtt", "required": False},
+                    }
+                }
+            }
+        },
+        factory=EngineFactory({"serial": build_serial, "mqtt": build_mqtt}),
+    )
+
+    runtime.connect()
+    assert created == ["COM1"]
+    runtime.duts["board"].engine("mqtt")
+    assert created == ["COM1", "mqtt"]
+    runtime.close()
+
+
+def test_mapping_rejects_non_boolean_connection_required() -> None:
+    with pytest.raises(ConfigurationError, match="required must be boolean"):
+        load_mapping({"devices": {"board": {"connections": {"serial": {"protocol": "serial", "required": "no"}}}}})
 
 
 def test_runtime_rejects_any_invalid_device_before_creating_a_transport() -> None:

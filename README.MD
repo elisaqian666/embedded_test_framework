@@ -5,8 +5,8 @@ with embedded devices and initializing generic devices under test (DUTs).
 
 It provides:
 
-- communication clients for SSH, FTP/FTPS, HTTP/HTTPS, TCP/UDP sockets,
-  serial ports, and WebSocket;
+- communication clients for ADB, MQTT, SSH, FTP/FTPS, HTTP/HTTPS, TCP/UDP
+  sockets, serial ports, and WebSocket;
 - configuration loading from JSON or TOML, with environment-variable
   substitution;
 - configuration-driven connection creation and DUT lifecycle management;
@@ -45,6 +45,11 @@ operations, such as `Stm32Device.serial()` or Modbus PLC register access.
 See [the communication package](communication/README.md) for the
 transport interfaces and connection configuration fields.
 
+Connections are required by default and open during `Runtime.connect()`. Set
+`"required": false` for an optional connection (for example MQTT on a Linux
+DUT); it is validated during setup but opens only when `device.engine("mqtt")`
+or the adapter API first uses it.
+
 ## System-test example
 
 The SSH command and SCP upload examples are in `system_tests/test_examples/`.
@@ -58,6 +63,27 @@ python -m pytest -v system_tests/test_examples/test_ssh_command.py system_tests/
 The test class inherits from `embedded_test_framework.embedded_test_base.EmbeddedTestCase`.
 Set `dut_name` for one DUT, or `dut_names` for several; all selected DUTs are
 available through `self.duts`, and the first is also available as `self.dut`.
+
+## CI results (JUnit XML)
+
+Pytest writes the CI result file; the framework does not need a report plugin.
+Use the same command in a test runner that Jenkins uses for system tests:
+
+```bash
+mkdir -p test-results
+python -m pytest -q system_tests/test_examples \
+  --junitxml=test-results/junit.xml \
+  -o junit_logging=all \
+  -o junit_log_passing_tests=false
+```
+
+`junit.xml` contains each case's pass/fail/error result, failure traceback, and
+captured logs for failed cases. Publish it in Jenkins with
+`junit testResults: 'test-results/junit.xml'`; archive `test_logs/**` separately
+for ReportCenter and Artifactory. The included framework `Jenkinsfile` already
+does this for framework unit tests. The external system-test runner must create
+the same `test-results/junit.xml` file because `system_tests/Jenkinsfile`
+already copies and publishes that exact path.
 
 ## Write system tests
 
@@ -92,7 +118,23 @@ Use `GIVEN`, `WHEN`, and `THEN` comments in every system-test method:
 - **THEN**: observable assertions.
 
 Do not add pytest markers or `pytest.ini` for these tests. Hardware that is
-not configured may skip through its test's explicit configuration rule.
+not configured must use a `TESTCONFIG` that defines its required connections
+and capabilities.
+
+```python
+config = {
+    "devices": {
+        "linux_dut": {
+            "metadata": {"type": "linux"},
+            "default_connection": "ssh",
+            "connections": {
+                "ssh": {"protocol": "ssh", "options": {"address": "192.0.2.10", "username": "operator", "password": "${SSH_PASSWORD}"}},
+                "mqtt": {"protocol": "mqtt", "required": False, "options": {"host": "192.0.2.20"}},
+            },
+        }
+    }
+}
+```
 
 ## Framework overview
 
@@ -128,8 +170,8 @@ flowchart TD
     R --> D[DeviceFactory\nmetadata.type selects Device]
     D --> C[Runtime.connect]
     C --> BD[BaseDevice.connect]
-    BD --> EF[EngineFactory.create\nvalidate and build connection]
-    EF --> H[Transport / hardware]
+    BD --> EF[EngineFactory.create\nrequired connections]
+    EF --> H[Transport / hardware\noptional on first engine use]
     H --> T[Test method uses self.dut or self.engine]
     T --> X[EmbeddedTestCase.tearDownClass]
     X --> RC[Runtime.close → BaseDevice.close → Transport.close]
@@ -191,6 +233,16 @@ Use `self.dut.shell()` for Linux filesystem, memory, and process operations.
 Use `self.dut.execute()` only when the test needs a `CommandResult` with an
 exit status.
 
+The inherited `test_zzzz_check_for_crashes` case scans a Linux DUT with an SSH
+connection for core files after the feature cases have run. It fails if it finds
+any files, after downloading them into the same test's artifact directory. It
+searches
+in `/var/lib/systemd/coredump` and `/var/crash`. Found files are downloaded to
+`test_logs/<run>/<test-class>/test_zzzz_check_for_crashes/coredumps/<dut-name>/`.
+Override the locations in
+device metadata when needed: `"coredump_paths": ["/custom/crashes"]`.
+Collection failures are logged but do not replace the test result.
+
 ## Extend the framework
 
 Add a class only when it owns real behavior that cannot live in an existing
@@ -200,15 +252,22 @@ not define connection settings.
 ### Add a device
 
 1. Add a `BaseDevice` subclass under the appropriate `devices/` category.
-   Declare its `capabilities` and expose only the APIs matching those
-   capabilities. For example, an STM32 adapter exposes `serial()`; it does not
+   Declare its static `capabilities` and expose only the APIs matching those
+   capabilities. Declare protocol-derived capabilities in
+   `connection_capabilities`; they are available only when that protocol is
+   configured. For example, an STM32 adapter exposes `serial()`; it does not
    inherit Linux shell methods.
 2. Add exactly one `metadata.type` entry to `DeviceFactory` in
    `devices/base.py`. `generic` remains the default for configurations that do
    not need a device-specific adapter.
 3. Set that type in `config/test_config.py`, then add a small unit test for
-   factory selection and the device API. Keep hardware checks in a skippable
-   system test when no configured target is available.
+   factory selection and the device API. Run hardware checks with a
+   `TESTCONFIG` that defines the target's required connections.
+
+`metadata.type` identifies the DUT family. A configured protocol adds a
+capability only when that adapter declares it in `connection_capabilities`.
+A `stm32` or `linux` DUT may expose MQTT alongside serial or SSH, so do not
+create a separate MQTT-only device type for an existing DUT.
 
 ### Add an engine
 

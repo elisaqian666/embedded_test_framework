@@ -1,9 +1,10 @@
 """LAN/SCPI control for a RIGOL oscilloscope."""
 
-import platform
 import socket
-import subprocess
 from pathlib import Path
+
+from embedded_test_framework.helpers.he_network import NetworkHelper
+from embedded_test_framework.protocols.scpi import ScpiProtocol
 
 
 class Oscilloscope:
@@ -16,11 +17,10 @@ class Oscilloscope:
             raise ValueError("host, port (1..65535), timeout, and model must be valid")
         self.host, self.port, self.timeout, self.model = host, port, timeout, model.upper()
         self._socket: socket.socket | None = None
-        self._buffer = bytearray()
+        self._scpi: ScpiProtocol | None = None
 
     def ping(self) -> bool:
-        flag = "-n" if platform.system() == "Windows" else "-c"
-        return subprocess.run(["ping", flag, "1", self.host], capture_output=True, timeout=self.timeout).returncode == 0
+        return NetworkHelper.ping(self.host, timeout=self.timeout)
 
     def connect(self, *, check_ping: bool = True) -> None:
         """Connect and verify the configured RIGOL model with ``*IDN?``."""
@@ -29,6 +29,7 @@ class Oscilloscope:
         if check_ping and not self.ping():
             raise ConnectionError(f"Oscilloscope does not respond to ping: {self.host}")
         self._socket = socket.create_connection((self.host, self.port), self.timeout)
+        self._scpi = ScpiProtocol(self._socket)
         try:
             identity = self._query_connected("*IDN?").upper()
             if "RIGOL" not in identity or self.model not in identity:
@@ -44,13 +45,13 @@ class Oscilloscope:
         if self._socket is not None:
             self._socket.close()
             self._socket = None
-        self._buffer.clear()
+        self._scpi = None
 
     def command(self, scpi: str) -> None:
         if not scpi.strip():
             raise ValueError("SCPI command must not be empty")
         self.connect()
-        self._socket.sendall((scpi.rstrip("\r\n") + "\n").encode())
+        self._scpi.command(scpi)
 
     def query(self, scpi: str) -> str:
         if not scpi.strip().endswith("?"):
@@ -59,27 +60,7 @@ class Oscilloscope:
         return self._query_connected(scpi)
 
     def _query_connected(self, scpi: str) -> str:
-        self._socket.sendall((scpi.rstrip("\r\n") + "\n").encode())
-        return self._read_until(b"\n").decode().strip()
-
-    def _read_until(self, delimiter: bytes) -> bytes:
-        while (end := self._buffer.find(delimiter)) < 0:
-            if not (chunk := self._socket.recv(4096)):
-                raise ConnectionError("Oscilloscope closed the connection")
-            self._buffer.extend(chunk)
-        end += len(delimiter)
-        data = bytes(self._buffer[:end])
-        del self._buffer[:end]
-        return data
-
-    def _read_exactly(self, size: int) -> bytes:
-        while len(self._buffer) < size:
-            if not (chunk := self._socket.recv(4096)):
-                raise ConnectionError("Oscilloscope closed the connection")
-            self._buffer.extend(chunk)
-        data = bytes(self._buffer[:size])
-        del self._buffer[:size]
-        return data
+        return self._scpi.query(scpi)
 
     def identify(self) -> str:
         return self.query("*IDN?")
@@ -98,13 +79,13 @@ class Oscilloscope:
 
     def save_screenshot(self, destination: str | Path) -> Path:
         self.connect()
-        self._socket.sendall(b":DISP:DATA? ON,OFF,PNG\n")
-        if self._read_exactly(1) != b"#":
+        self._scpi.command(":DISP:DATA? ON,OFF,PNG")
+        if self._scpi.read_exactly(1) != b"#":
             raise ValueError("Invalid screenshot response header")
-        width = int(self._read_exactly(1))
-        length = int(self._read_exactly(width))
-        image = self._read_exactly(length)
-        self._read_exactly(1)
+        width = int(self._scpi.read_exactly(1))
+        length = int(self._scpi.read_exactly(width))
+        image = self._scpi.read_exactly(length)
+        self._scpi.read_exactly(1)
         target = Path(destination)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(image)

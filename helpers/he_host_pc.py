@@ -35,7 +35,6 @@ class ContentHandler:
             raise FileNotFoundError(source)
         return subprocess.Popen([str(vlc_executable), *ContentHandler.VLC_TEST_ARGUMENTS, *extra_args, str(source)], text=True)
 
-    
 
 class SystemHelper(object):
     """Purpose: Control host-PC storage, processes, networking, display, and files."""
@@ -72,7 +71,12 @@ class SystemHelper(object):
             SystemHelper.logger.info("Processes matching %s: %s", name, matches)
             return matches
         output = subprocess.run(["ps", "-eo", "pid=,comm="], capture_output=True, text=True, check=True).stdout
-        matches = [(int(pid), process) for line in output.splitlines() if name.lower() in line.lower() for pid, process in [line.strip().split(None, 1)]]
+        matches = [
+            (int(pid), process)
+            for line in output.splitlines()
+            if name.lower() in line.lower()
+            for pid, process in [line.strip().split(None, 1)]
+        ]
         SystemHelper.logger.info("Processes matching %s: %s", name, matches)
         return matches
 
@@ -226,14 +230,19 @@ class SystemHelper(object):
 
     @staticmethod
     def _powershell(command: str, *, timeout: float = 30, check: bool = True) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", command], capture_output=True, text=True, timeout=timeout, check=check)
+        return subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", command],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=check,
+        )
 
     @staticmethod
     def _require_windows() -> None:
         if not SystemHelper.is_os_windows():
             raise OSError("This operation is only available on Windows")
 
-    
     @staticmethod
     def is_file_signed(path: str | Path, *, timeout: float = 30) -> bool:
         """Return whether a Windows binary has a valid Authenticode signature."""

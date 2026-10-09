@@ -3,14 +3,8 @@
 from pathlib import Path
 from typing import Any, Self
 
-from embedded_test_framework.configurator.configurator_dut import (
-    EngineFactory,
-    FrameworkConfig,
-    load_config,
-    load_mapping,
-)
+from embedded_test_framework.configurator.configurator_dut import EngineFactory, FrameworkConfig, load_config, load_mapping
 from embedded_test_framework.devices.base import BaseDevice, DeviceFactory
-from embedded_test_framework.helpers.he_common import CommonHelpers
 from embedded_test_framework.instruments import Oscilloscope
 from embedded_test_framework.lib import assertion
 
@@ -28,18 +22,10 @@ class Runtime:
         device_factory: DeviceFactory | None = None,
     ) -> "Runtime":
         """Validate and assemble a runtime without connecting hardware."""
-        return cls(
-            load_mapping(values, source=source),
-            factory=factory,
-            device_factory=device_factory,
-        )
+        return cls(load_mapping(values, source=source), factory=factory, device_factory=device_factory)
 
     def __init__(
-        self,
-        config: FrameworkConfig,
-        *,
-        factory: EngineFactory | None = None,
-        device_factory: DeviceFactory | None = None,
+        self, config: FrameworkConfig, *, factory: EngineFactory | None = None, device_factory: DeviceFactory | None = None
     ) -> None:
         self.config = config
         self._factory = factory or EngineFactory()
@@ -50,12 +36,10 @@ class Runtime:
             for connection in device.connections.values():
                 self._factory.validate(connection)
 
-        self.helpers = CommonHelpers()
         self.assertions = assertion
 
         self.duts: dict[str, BaseDevice] = {
-            name: self._device_factory.create(device, self._factory)
-            for name, device in config.devices.items()
+            name: self._device_factory.create(device, self._factory) for name, device in config.devices.items()
         }
         self.oscilloscope = None
         if config.oscilloscope and config.oscilloscope.enable:
@@ -80,10 +64,7 @@ class Runtime:
             try:
                 self.close()
             except Exception as cleanup_error:  # noqa: BLE001
-                error.add_note(
-                    f"Runtime cleanup also failed: "
-                    f"{type(cleanup_error).__name__}"
-                )
+                error.add_note(f"Runtime cleanup also failed: " f"{type(cleanup_error).__name__}")
             raise
 
         return self
@@ -113,22 +94,14 @@ class Runtime:
     def __enter__(self) -> Self:
         return self.connect()
 
-    def __exit__(
-        self,
-        _exc_type: object,
-        error: BaseException | None,
-        _traceback: object,
-    ) -> None:
+    def __exit__(self, _exc_type: object, error: BaseException | None, _traceback: object) -> None:
         try:
             self.close()
         except Exception as cleanup_error:
             if error is None:
                 raise
 
-            error.add_note(
-                f"Runtime cleanup also failed: "
-                f"{type(cleanup_error).__name__}"
-            )
+            error.add_note(f"Runtime cleanup also failed: " f"{type(cleanup_error).__name__}")
 
 
 def initialize(
@@ -153,11 +126,7 @@ def initialize(
             result = runtime.duts["board"].execute("uname -a")
             runtime.assertions.assert_equal(result.exit_status, 0)
     """
-    runtime = Runtime(
-        load_config(path, overrides=overrides),
-        factory=factory,
-        device_factory=device_factory,
-    )
+    runtime = Runtime(load_config(path, overrides=overrides), factory=factory, device_factory=device_factory)
 
     return runtime.connect() if connect else runtime
 
@@ -171,11 +140,6 @@ def initialize_from_mapping(
     connect: bool = True,
 ) -> Runtime:
     """Compatibility wrapper that preserves the legacy optional connect step."""
-    runtime = Runtime.from_mapping(
-        values,
-        source=source,
-        factory=factory,
-        device_factory=device_factory,
-    )
+    runtime = Runtime.from_mapping(values, source=source, factory=factory, device_factory=device_factory)
 
     return runtime.connect() if connect else runtime

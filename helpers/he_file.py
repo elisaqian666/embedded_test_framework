@@ -1,9 +1,12 @@
 """Common local filesystem operations."""
 
-import shutil
-import tempfile
 import ctypes
+import hashlib
 import time
+import re
+import shutil
+import subprocess
+import tempfile
 from ctypes import wintypes
 from pathlib import Path
 from embedded_test_framework.helpers.he_host_pc import SystemHelper
@@ -11,6 +14,16 @@ from embedded_test_framework.helpers.he_host_pc import SystemHelper
 
 class FileHelper:
     """Local filesystem operations for the test runner."""
+
+    @staticmethod
+    def checksum(path: str | Path, algorithm: str = "sha256") -> str:
+        with Path(path).open("rb") as stream:
+            return hashlib.file_digest(stream, algorithm).hexdigest()
+
+    @staticmethod
+    def are_files_identical(first: str | Path, second: str | Path) -> bool:
+        left, right = Path(first), Path(second)
+        return left.is_file() and right.is_file() and left.stat().st_size == right.stat().st_size and FileHelper.checksum(left) == FileHelper.checksum(right)
 
     @staticmethod
     def exists(path: str | Path) -> bool:
@@ -35,10 +48,7 @@ class FileHelper:
         return target
 
     @staticmethod
-    def copy_file(
-        source: str | Path,
-        destination: str | Path,
-    ) -> Path:
+    def copy_file(source: str | Path, destination: str | Path) -> Path:
         """Copy a local file and create destination parents."""
         source_path = Path(source)
         target = Path(destination)
@@ -50,10 +60,7 @@ class FileHelper:
         return Path(shutil.copy2(source_path, target))
 
     @staticmethod
-    def move_file(
-        source: str | Path,
-        destination: str | Path,
-    ) -> Path:
+    def move_file(source: str | Path, destination: str | Path) -> Path:
         """Move a local file or directory."""
         source_path = Path(source)
         target = Path(destination)
@@ -91,21 +98,12 @@ class FileHelper:
         shutil.rmtree(target)
 
     @staticmethod
-    def read_text(
-        path: str | Path,
-        *,
-        encoding: str = "utf-8",
-    ) -> str:
+    def read_text(path: str | Path, *, encoding: str = "utf-8") -> str:
         """Read a local text file."""
         return Path(path).read_text(encoding=encoding)
 
     @staticmethod
-    def write_text(
-        path: str | Path,
-        content: str,
-        *,
-        encoding: str = "utf-8",
-    ) -> Path:
+    def write_text(path: str | Path, content: str, *, encoding: str = "utf-8") -> Path:
         """Write a local text file and create destination parents."""
         target = Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -113,11 +111,7 @@ class FileHelper:
         return target
 
     @staticmethod
-    def list_files(
-        path: str | Path,
-        *,
-        recursive: bool = False,
-    ) -> list[Path]:
+    def list_files(path: str | Path, *, recursive: bool = False) -> list[Path]:
         """Return regular files under a local directory."""
         root = Path(path)
 
@@ -126,11 +120,7 @@ class FileHelper:
 
         entries = root.rglob("*") if recursive else root.iterdir()
 
-        return [
-            entry
-            for entry in entries
-            if entry.is_file()
-        ]
+        return [entry for entry in entries if entry.is_file()]
 
     @staticmethod
     def read_usb_files(drive: str | Path) -> list[Path]:
@@ -174,7 +164,16 @@ class FileHelper:
             raise ValueError("disk_number must be a non-system Windows disk number")
         if filesystem.upper() not in {"FAT32", "NTFS", "EXFAT"}:
             raise ValueError("filesystem must be FAT32, NTFS, or exFAT")
-        script = "\n".join((f"select disk {disk_number}", "clean", "create partition primary", f"format fs={filesystem} quick label={label}", "assign", "exit"))
+        script = "\n".join(
+            (
+                f"select disk {disk_number}",
+                "clean",
+                "create partition primary",
+                f"format fs={filesystem} quick label={label}",
+                "assign",
+                "exit",
+            )
+        )
         with tempfile.NamedTemporaryFile("w", encoding="ascii", suffix=".txt", delete=False) as stream:
             stream.write(script)
             script_path = Path(stream.name)

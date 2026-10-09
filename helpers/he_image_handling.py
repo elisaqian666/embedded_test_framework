@@ -1,9 +1,5 @@
 """
-- Purpose:      as helper to control/handle the image
-- Author:       KUNDW.
-- Created:      06/07/2017.
-- Copyright:    (c) Barco 2017.
-- License:      All Rights Reserved.
+As helper to control/handle the image
 """
 
 import difflib
@@ -20,7 +16,7 @@ import numpy
 from barco_pytesseract import pytesseract
 from PIL import Image, ImageChops, ImageFilter
 
-from TEnTo.configurator.config_labels import LOGGERS
+from embedded_test_framework.configurator.config_labels import LOGGERS
 
 
 class ColorsRGB:
@@ -51,7 +47,7 @@ class ImageHelper(object):
         return Image.open(image_path)
 
     def open_image_from_memory(self, img_bytes):
-        """create an new image from bytes image in memory
+        """create a new image from bytes image in memory
 
         :return: PIL image.
         """
@@ -84,7 +80,7 @@ class ImageHelper(object):
         del image
 
     def create_image(self, mode, w, h, color=None):
-        """create an new image of the required size and color mode.
+        """create a new image of the required size and color mode.
 
         :param mode: string 'RGB','L','1','CMYK',....
                     1 (1-bit pixels, black and white, stored with one pixel per byte)

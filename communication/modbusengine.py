@@ -1,4 +1,4 @@
-"""DEPRECATED compatibility wrapper; use protocols.modbus.rtu instead."""
+"""Configured Modbus RTU engine over an RS-485 serial session."""
 
 import logging
 

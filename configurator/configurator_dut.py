@@ -69,6 +69,7 @@ class ConnectionConfig:
 
     protocol: str
     options: dict[str, Any] = field(default_factory=dict, repr=False)
+    required: bool = True
 
 
 @dataclass(frozen=True)
@@ -118,13 +119,16 @@ def _device(name: str, raw: Any) -> DeviceConfig:
     for alias, raw_connection in _mapping(values.get("connections", {}), f"devices.{name}.connections").items():
         location = f"devices.{name}.connections.{alias}"
         connection = _mapping(raw_connection, location)
-        _known_keys(connection, {"protocol", "options"}, location)
+        _known_keys(connection, {"protocol", "options", "required"}, location)
         protocol = connection.get("protocol")
         if not alias or not isinstance(protocol, str) or not protocol:
             message = f"{location} requires a non-empty alias and protocol"
             raise ConfigurationError(message)
+        required = connection.get("required", True)
+        if type(required) is not bool:
+            raise ConfigurationError(f"{location}.required must be boolean")
         connections[alias] = ConnectionConfig(
-            protocol.lower(), copy.deepcopy(_mapping(connection.get("options", {}), location + ".options"))
+            protocol.lower(), copy.deepcopy(_mapping(connection.get("options", {}), location + ".options")), required
         )
     if not name or not connections:
         message = "Each device requires a name and at least one connection"
@@ -203,6 +207,8 @@ def load_config(path: str | Path, *, overrides: dict[str, Any] | None = None) ->
 
 
 _FACTORIES = {
+    "adb": ("adb", "make_adb_client"),
+    "mqtt": ("mqtt", "make_mqtt_client"),
     "ssh": ("ssh", "make_ssh_transport"),
     "serial": ("serial", "make_serial_transport"),
     "modbus": ("modbusengine", "make_modbus_rtu_engine"),
@@ -216,6 +222,8 @@ _FACTORIES = {
     "websocket": ("websocket", "make_websocket_client"),
 }
 _ENGINE_LOGGER_NAMES = {
+    "adb": LOGGERS.ADB,
+    "mqtt": LOGGERS.MQTT,
     "ssh": LOGGERS.SSH_ENGINE,
     "serial": LOGGERS.SERIAL_ENGINE,
     "modbus": LOGGERS.SERIAL_ENGINE,
@@ -288,7 +296,7 @@ class EngineFactory:
             ):
                 expectation = "non-negative" if minimum_inclusive else "positive"
                 raise ConfigurationError(f"{name} must be a finite {expectation} number")
-        for name in ("host", "hostname", "address", "com_port", "username", "url", "base_url"):
+        for name in ("host", "hostname", "address", "com_port", "serial", "username", "url", "base_url", "executable", "client_id"):
             if name in options and (not isinstance(options[name], str) or not options[name]):
                 raise ConfigurationError(f"{name} must be a non-empty string")
         for name, minimum, maximum in (("port", 1, 65535), ("baudrate", 1, None), ("retry", 0, None)):
