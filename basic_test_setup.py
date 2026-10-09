@@ -3,6 +3,7 @@ import pytest
 import os
 import re
 import deprecation
+from datetime import datetime
 from pathlib import Path
 from unittest import TestCase, SkipTest
 from typing import Dict
@@ -28,6 +29,66 @@ logger = logging.getLogger(LOGGERS.TEST_CASE)
 
 _LOG_INITIALIZED = False
 _TEST_RESULTS: dict[str, str] = {}
+_TEST_FAILURES: dict[str, list[object]] = {}
+_TEST_PASSES: dict[str, object] = {}
+_TEST_CONTEXTS: dict[str, tuple[str, ...]] = {}
+_TEST_ARTIFACTS: dict[str, Path] = {}
+_TEST_FW = "example-fw-1.0.0"  # ponytail: replace this placeholder when firmware version discovery is available.
+
+
+def register_test_context(nodeid: str, dut_names: tuple[str, ...]) -> None:
+    """Expose configured DUT names to the end-of-session failure reporter."""
+    _TEST_CONTEXTS[nodeid] = dut_names
+
+
+def _summary_path(nodeid: str) -> Path:
+    artifact = _TEST_ARTIFACTS.get(nodeid)
+    if artifact:
+        return artifact / "summary.txt"
+    fallback = setup_test_log_folder() / "failed" / re.sub(r"[^A-Za-z0-9._-]+", "_", nodeid)
+    fallback.mkdir(parents=True, exist_ok=True)
+    return fallback / "summary.txt"
+
+
+def _report_text(report: object) -> tuple[str, str]:
+    longrepr = getattr(report, "longrepr", None)
+    traceback = getattr(report, "longreprtext", None) or str(longrepr or "No traceback available.")
+    reprcrash = getattr(longrepr, "reprcrash", None)
+    error = getattr(reprcrash, "message", None) or traceback
+    captured_logs = getattr(report, "caplog", "")
+    if captured_logs:
+        error = f"{error}\n\nCaptured error logs:\n{captured_logs}"
+    return error, traceback
+
+
+def _write_summary(nodeid: str, reports: list[object], failed: bool) -> None:
+    test_class = nodeid.rsplit("::", 1)[0]
+    devices = ", ".join(_TEST_CONTEXTS.get(test_class, ())) or "not available"
+    duration = sum(float(getattr(report, "duration", 0)) for report in reports)
+    sections = []
+    for report in reports:
+        error, trace = _report_text(report)
+        stage = getattr(report, "when", "unknown")
+        sections.append((stage, error, trace))
+
+    content = [
+        "# 1. Test Context",
+        f"- Test devices: {devices}",
+        f"- Test FW: {_TEST_FW}",
+        f"- Test time: {datetime.now().astimezone().isoformat(timespec='seconds')}",
+        f"- Test Durations: {duration:.2f}s",
+        f"- Jenkins Agent: {os.getenv('NODE_NAME') or os.getenv('JENKINS_AGENT') or 'local'}",
+        "",
+    ]
+    if not failed:
+        _summary_path(nodeid).write_text("\n".join(content) + "\n", encoding="utf-8")
+        return
+
+    content.append("# 2. Error Text")
+    content.extend(f"## {stage}\n{error}\n" for stage, error, _ in sections)
+    content.append("# 3. Call Trace")
+    content.extend(f"## {stage}\n{trace}\n" for stage, _, trace in sections)
+    _summary_path(nodeid).write_text("\n".join(content), encoding="utf-8")
 
 
 class _TestResultReporter:
@@ -35,8 +96,10 @@ class _TestResultReporter:
     def pytest_runtest_logreport(self, report):
         if report.failed:
             _TEST_RESULTS[report.nodeid] = "FAILED"
+            _TEST_FAILURES.setdefault(report.nodeid, []).append(report)
         elif report.when == "call" and report.passed:
             _TEST_RESULTS.setdefault(report.nodeid, "PASSED")
+            _TEST_PASSES[report.nodeid] = report
 
     @pytest.hookimpl
     def pytest_sessionfinish(self, session, exitstatus):
@@ -45,6 +108,9 @@ class _TestResultReporter:
                 for nodeid, result in _TEST_RESULTS.items():
                     if result == outcome:
                         stream.write(f"{outcome} {nodeid}\n")
+        for nodeid, result in _TEST_RESULTS.items():
+            reports = _TEST_FAILURES[nodeid] if result == "FAILED" else [_TEST_PASSES[nodeid]]
+            _write_summary(nodeid, reports, result == "FAILED")
 
 
 def _register_failed_case_reporter(config: pytest.Config) -> None:
@@ -125,28 +191,30 @@ class UnittestTestCase:
         _register_failed_case_reporter(request.config)
         logger.info("setup_class_fixture starting...")
         cls.pytest_request = request  # Store the request for potential use in tests
-        cls.setUpClass()
-        yield
-        logger.info("teardown_class_fixture starting...")
-        cls.tearDownClass()
-
-        # Backward compatibility of unittest.TestCase
-        cls.doClassCleanups()
-        del cls.pytest_request  # Clean up the pytest_request attribute after use
+        try:
+            cls.setUpClass()
+            yield
+            logger.info("teardown_class_fixture starting...")
+            cls.tearDownClass()
+        finally:
+            try:
+                cls.doClassCleanups()
+            finally:
+                del cls.pytest_request
 
     @pytest.fixture(autouse=True)
     def setup_teardown_fixture(self, get_cur_test_id):
         """Simulate unittest.TestCase's setUp and tearDown using pytest fixtures"""
         logger.info("========== TEST START: %s =========", self._test_id)
         logger.info("setup_fixture starting...")
-        self.setUp()
-        yield
-        logger.info("teardown_fixture starting...")
-        self.tearDown()
-
-        # Backward compatibility of unittest.TestCase
-        self.doCleanups()
-        logger.info("=========== TEST END: %s ===========", self._test_id)
+        try:
+            self.setUp()
+            yield
+            logger.info("teardown_fixture starting...")
+            self.tearDown()
+        finally:
+            self.doCleanups()
+            logger.info("=========== TEST END: %s ===========", self._test_id)
 
     @classmethod
     def setUpClass(cls):
@@ -267,13 +335,13 @@ class BasicTestClass(UnittestTestCase):
         cls.test_class_log_store_folder = str(class_folder)
         cls.test_method_log_store_folder = cls.test_class_log_store_folder
         cls.test_summary_file = str(class_folder / "summary.txt")
-        Path(cls.test_summary_file).touch(exist_ok=True)
 
     def setUp(self):
         super().setUp()
         method_folder = Path(self.test_class_log_store_folder) / re.sub(r"[^A-Za-z0-9._-]+", "_", self._test_id.rsplit("::", 1)[-1])
         method_folder.mkdir(parents=True, exist_ok=True)
         self.test_method_log_store_folder = str(method_folder)
+        _TEST_ARTIFACTS[self._test_id] = method_folder
 
     @classmethod
     def _print_test_environment(cls):

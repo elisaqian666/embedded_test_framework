@@ -3,12 +3,16 @@
 import shlex
 import logging
 from collections.abc import Callable
+from pathlib import Path
+from typing import Any
 from embedded_test_framework.configurator.config_labels import LOGGERS
 from embedded_test_framework.helpers.he_shell import CommandResult
 
 
 class CoreDumpHelper:
     """Detect coredumps on a remote device."""
+
+    DEFAULT_PATHS = ("/var/lib/systemd/coredump", "/var/crash")
 
     def __init__(self, execute: Callable[[str, float], CommandResult], paths: tuple[str, ...], pattern: str = "core*") -> None:
         if not paths:
@@ -28,7 +32,7 @@ class CoreDumpHelper:
         pattern = shlex.quote(self._pattern)
 
         result = self._execute(f"find {paths} -type f -name {pattern} 2>/dev/null", timeout)
-        self.logger.info(f"Find result: {result}")
+        self.logger.info("Coredump search result: %s", result)
 
         if result.exit_status not in (0, 1):
             result.check()
@@ -38,6 +42,16 @@ class CoreDumpHelper:
     def exists(self, timeout: float = 10) -> bool:
         """Return whether at least one coredump exists."""
         return bool(self.find(timeout))
+
+    def collect(self, destination: str | Path, download: Callable[[str, str], Any], timeout: float = 10) -> list[Path]:
+        """Download detected coredumps and return their expected artifact paths."""
+        destination = Path(destination)
+        destination.mkdir(parents=True, exist_ok=True)
+        files = self.find(timeout)
+        for remote_path in files:
+            self.logger.info("Collecting coredump %s into %s", remote_path, destination)
+            download(remote_path, str(destination))
+        return [destination / Path(remote_path).name for remote_path in files]
 
 
 if __name__ == "__main__":

@@ -64,6 +64,27 @@ The test class inherits from `embedded_test_framework.embedded_test_base.Embedde
 Set `dut_name` for one DUT, or `dut_names` for several; all selected DUTs are
 available through `self.duts`, and the first is also available as `self.dut`.
 
+## CI results (JUnit XML)
+
+Pytest writes the CI result file; the framework does not need a report plugin.
+Use the same command in a test runner that Jenkins uses for system tests:
+
+```bash
+mkdir -p test-results
+python -m pytest -q system_tests/test_examples \
+  --junitxml=test-results/junit.xml \
+  -o junit_logging=all \
+  -o junit_log_passing_tests=false
+```
+
+`junit.xml` contains each case's pass/fail/error result, failure traceback, and
+captured logs for failed cases. Publish it in Jenkins with
+`junit testResults: 'test-results/junit.xml'`; archive `test_logs/**` separately
+for ReportCenter and Artifactory. The included framework `Jenkinsfile` already
+does this for framework unit tests. The external system-test runner must create
+the same `test-results/junit.xml` file because `system_tests/Jenkinsfile`
+already copies and publishes that exact path.
+
 ## Write system tests
 
 Put shared DUT settings in `config/test_config.py`. A system-test subclass
@@ -211,6 +232,16 @@ flowchart TD
 Use `self.dut.shell()` for Linux filesystem, memory, and process operations.
 Use `self.dut.execute()` only when the test needs a `CommandResult` with an
 exit status.
+
+The inherited `test_zzzz_check_for_crashes` case scans a Linux DUT with an SSH
+connection for core files after the feature cases have run. It fails if it finds
+any files, after downloading them into the same test's artifact directory. It
+searches
+in `/var/lib/systemd/coredump` and `/var/crash`. Found files are downloaded to
+`test_logs/<run>/<test-class>/test_zzzz_check_for_crashes/coredumps/<dut-name>/`.
+Override the locations in
+device metadata when needed: `"coredump_paths": ["/custom/crashes"]`.
+Collection failures are logged but do not replace the test result.
 
 ## Extend the framework
 
