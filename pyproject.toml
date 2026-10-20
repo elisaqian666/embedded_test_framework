@@ -17,6 +17,7 @@ dependencies = [
     "paho-mqtt==2.1.0",
     "pyautogui==0.9.54",
     "pyserial==3.5",
+    "python-can==4.6.1",
     "python-jenkins==1.8.3",
     "requests==2.34.2",
     "scp==0.16.1",
@@ -24,6 +25,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+image = [
+    "pillow==12.3.0",
+    "numpy>=2.0,<3",
+    "scikit-image==0.26.0",
+]
 dev = [
     "black==26.5.1",
     "pytest==9.1.1",

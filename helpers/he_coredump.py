@@ -1,18 +1,19 @@
 """Coredump detection for devices that expose a command executor."""
 
-import shlex
 import logging
+import shlex
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+
 from embedded_test_framework.configurator.config_labels import LOGGERS
-from embedded_test_framework.helpers.he_shell import CommandResult
+from embedded_test_framework.lib.command_result import CommandResult
 
 
 class CoreDumpHelper:
     """Detect coredumps on a remote device."""
 
-    DEFAULT_PATHS = ("/var/lib/systemd/coredump", "/var/crash")
+    DEFAULT_PATHS = ("/var/lib/systemd/coredump", "/var/crash", "/tmp/")
 
     def __init__(self, execute: Callable[[str, float], CommandResult], paths: tuple[str, ...], pattern: str = "core*") -> None:
         if not paths:
@@ -28,29 +29,54 @@ class CoreDumpHelper:
 
     def find(self, timeout: float = 10) -> list[str]:
         """Return coredump paths found on the device."""
+
         paths = " ".join(shlex.quote(path) for path in self._paths)
         pattern = shlex.quote(self._pattern)
 
-        result = self._execute(f"find {paths} -type f -name {pattern} 2>/dev/null", timeout)
-        self.logger.info("Coredump search result: %s", result)
+        command = (
+            f"for dir in {paths}; do "
+            f'[ -d "$dir" ] || continue; '
+            f'find "$dir" -type f -name {pattern} || exit $?; '
+            f"done"
+        )
 
-        if result.exit_status not in (0, 1):
-            result.check()
+        result = self._execute(command, timeout)
+        result.check()
+        files = [
+            line.strip()
+            for line in result.stdout.splitlines()
+            if line.strip()
+        ]
+        self.logger.info("Found %d coredump files: %s", len(files), files)
+        return files
 
-        return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    # def find(self, timeout: float = 10) -> list[str]:
+    #     """Return coredump paths found on the device."""
+    #     paths = " ".join(shlex.quote(path) for path in self._paths)
+    #     pattern = shlex.quote(self._pattern)
+    #
+    #     result = self._execute(f"find {paths} -type f -name {pattern}", timeout)
+    #     self.logger.info("Coredump search result: %s", result)
+    #
+    #     result.check()
+    #
+    #     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
     def exists(self, timeout: float = 10) -> bool:
         """Return whether at least one coredump exists."""
         return bool(self.find(timeout))
 
     def collect(self, destination: str | Path, download: Callable[[str, str], Any], timeout: float = 10) -> list[Path]:
-        """Download detected coredumps and return their expected artifact paths."""
+        """Return detected artifact paths even if downloads fail; scan errors propagate."""
         destination = Path(destination)
         destination.mkdir(parents=True, exist_ok=True)
         files = self.find(timeout)
         for remote_path in files:
             self.logger.info("Collecting coredump %s into %s", remote_path, destination)
-            download(remote_path, str(destination))
+            try:
+                download(remote_path, str(destination))
+            except Exception:
+                self.logger.exception("Unable to download detected coredump %s", remote_path)
         return [destination / Path(remote_path).name for remote_path in files]
 
 

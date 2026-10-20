@@ -16,8 +16,6 @@ class NetworkHelper:
 
     logger = logging.getLogger(LOGGERS.HELPER)
 
-    is_os_windows = SystemHelper.is_os_windows()
-
     @staticmethod
     def is_port_open(host: str, port: int, timeout: float = 1) -> bool:
         """Return whether a TCP connection can be established."""
@@ -55,7 +53,7 @@ class NetworkHelper:
         if packets <= 0 or timeout <= 0:
             raise ValueError("packets and timeout must be positive")
 
-        if NetworkHelper.is_os_windows():
+        if SystemHelper.is_os_windows():
             command = ["ping", "-n", str(packets), "-w", str(int(timeout * 1000)), host]
         else:
             command = ["ping", "-c", str(packets), host]
@@ -72,7 +70,7 @@ class NetworkHelper:
         """Return whether ICMP packet loss is at or below the allowed percentage."""
         if packets < 1 or not 0 <= loss_threshold <= 100 or timeout <= 0:
             raise ValueError("packets and timeout must be positive; loss_threshold must be 0..100")
-        args = ["ping", "-n" if NetworkHelper.is_os_windows() else "-c", str(packets), host]
+        args = ["ping", "-n" if SystemHelper.is_os_windows() else "-c", str(packets), host]
         result = subprocess.run(args, capture_output=True, text=True, timeout=packets * timeout + 5, check=False)
         match = re.search(r"(\d+(?:\.\d+)?)%\s*(?:loss|丢失)", result.stdout + result.stderr, re.IGNORECASE)
         return match is not None and float(match.group(1)) <= loss_threshold

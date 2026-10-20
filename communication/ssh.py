@@ -2,6 +2,7 @@
 
 import contextlib
 import logging
+import math
 import re
 import select
 import socketserver
@@ -9,18 +10,18 @@ import threading
 import time
 from functools import wraps
 
-import gevent
 import scp
 from paramiko import AuthenticationException, AutoAddPolicy, SSHClient, SSHException
-from embedded_test_framework.configurator.config_labels import LOGGERS
+
 from embedded_test_framework.communication._text import decode_to_str_if_byte
 from embedded_test_framework.communication.base import BaseTransport
+from embedded_test_framework.configurator.config_labels import LOGGERS
 from embedded_test_framework.lib.basic_helper_functions import listify
-from embedded_test_framework.lib.custom_exception import EmbeddedFrameworkException
+from embedded_test_framework.lib.command_result import CommandResult
+from embedded_test_framework.lib.custom_exception import SSHCommandError
 from embedded_test_framework.lib.timeout import TimeOutError, Timer, wait_no_exception_timeout, wait_timeout
 
 KEEP_ALIVE_INTERVAL = 2.5 * 60
-CHANNEL_TIME_OUT = 60
 
 
 def thread_lock(function):
@@ -38,21 +39,9 @@ class SshConnectionNotLostWithinTimeOut(TimeOutError):
     pass
 
 
-class EofNotReceivedError(RuntimeError):
-    pass
-
-
 class SSHNotResponsive(SSHException):
     """
     Unable to connect to client via SSH
-    """
-
-    pass
-
-
-class SSHCommandFailed(SSHException):
-    """
-    Fail to execute command vis SSH
     """
 
     pass
@@ -63,15 +52,17 @@ class SshTransport(BaseTransport):
     An object which delivers ssh functionality preferably call the maker function to use this class wrapper for paramiko
     """
 
-    def __init__(self, ssh_con: SSHClient, hostname, username, password, port=22):
+    def __init__(self, ssh_con: SSHClient, hostname, username, password, port=22, *, timeout: float = 60, retry: int = 4):
         self.ssh_con: SSHClient = ssh_con
         self.address = hostname
         self.username = username
         self.password = password
         self.port = port
+        self.timeout = timeout
+        self.retry = retry
         self.session = None
         self._lock = threading.RLock()
-        self.logger = logging.getLogger(LOGGERS.HELPER)
+        self.logger = logging.getLogger(LOGGERS.SSH_ENGINE)
 
     @staticmethod
     def __protocol__():
@@ -87,7 +78,7 @@ class SshTransport(BaseTransport):
         """
         self.logger.info("sleeping for 1 second to reinit")
         time.sleep(1)
-        new_eng = make_ssh_transport(self.address, self.username, self.password, port=self.port)
+        new_eng = make_ssh_transport(self.address, self.username, self.password, port=self.port, retry=self.retry, timeout=self.timeout)
 
         if self.ssh_con:  # And we still have the old SSH connection when there is issue calling "make_ssh_transport"
             try:
@@ -127,57 +118,39 @@ class SshTransport(BaseTransport):
         self.close()
 
     def _ssh_exec_command_w_timeout(self, command, time_out=10):
+        deadline = time.monotonic() + time_out
+        channel = None
+        output, errors = bytearray(), bytearray()
         try:
-            start_time = time.time()
-            _, stdout, stderr = self.ssh_con.exec_command(command, timeout=time_out)
-            self.logger.debug("Run exec_command finished.")
-            end_time = start_time + (max(time_out, CHANNEL_TIME_OUT) if time_out else CHANNEL_TIME_OUT)
-
-            if not stdout.channel.exit_status_ready():
-                self.logger.debug("Waiting for exit status ready...")
-                while time.time() < end_time:
-                    if stdout.channel.exit_status_ready():
-                        break
-                    time.sleep(0.05)
-                else:
-                    # This is safe workaround from https://github.com/paramiko/paramiko/issues/109#issuecomment-111621658
-                    self.logger.error("No EOF received. Force closing before trying reading data")
-                    stdout.channel.close()  # Force closing it so that we won't hang on read()
-                    stderr.channel.close()  # Force closing it so that we won't hang on read()
-
-                    cur_stdout = None
-                    with contextlib.suppress(Exception):
-                        cur_stdout = str(stdout.read().decode())
-                    cur_stderr = None
-                    with contextlib.suppress(Exception):
-                        cur_stderr = str(stderr.read().decode())
-
-                    error_message = "\n".join(
-                        [
-                            f"{self.__str__()}: '{command}' executed but timed out waiting stdout channel exit ({stdout.channel.closed=}, {stdout.channel.status_event=}, {stdout.channel.exit_status=}) for ({CHANNEL_TIME_OUT} sec)",
-                            "Current stdout " + "=" * 30,
-                            str(cur_stdout),
-                            "Current stderr " + "=" * 30,
-                            str(cur_stderr),
-                        ]
-                    )
-                    raise EofNotReceivedError(error_message)
-            self.logger.debug(
-                "time spent=%f stdout_eof=%d, stderr_eof=%d",
-                time.time() - start_time,
-                stdout.channel.eof_received,
-                stderr.channel.eof_received,
-            )
-            process_exit_status = stdout.channel.recv_exit_status()
-            ret_stdout = str(stdout.read().decode())
-            ret_stderr = str(stderr.read().decode())
-            return_val = ret_stdout, process_exit_status, ret_stderr
-            self.logger.debug("stdout_read:\t%s" % ret_stdout)
-            self.logger.debug("process exit status:\t%d" % process_exit_status)
-            self.logger.debug("stderr_read:\t%s" % ret_stderr)
-            return return_val
-        except Exception as e:
-            raise SSHCommandFailed(f"{self.__str__()}: {command=} and {time_out=}") from e
+            _, stdout, _ = self.ssh_con.exec_command(command, timeout=time_out)
+            channel = stdout.channel
+            channel.shutdown_write()
+            while True:
+                if time.monotonic() >= deadline:
+                    raise TimeoutError(f"command timed out after {time_out}s")
+                received = False
+                if channel.recv_ready():
+                    output.extend(channel.recv(65536))
+                    received = True
+                if channel.recv_stderr_ready():
+                    errors.extend(channel.recv_stderr(65536))
+                    received = True
+                if channel.exit_status_ready() and (channel.eof_received or channel.closed):
+                    if not channel.recv_ready() and not channel.recv_stderr_ready():
+                        status = channel.recv_exit_status()
+                        if status == -1:
+                            raise RuntimeError("SSH channel closed without an exit status")
+                        return output.decode(errors="replace"), status, errors.decode(errors="replace")
+                if not received:
+                    time.sleep(min(0.01, max(0, deadline - time.monotonic())))
+        except Exception as error:
+            raise SSHCommandError(
+                f"SSH command {command!r} failed (timeout={time_out}s): {error}; "
+                f"stdout={output.decode(errors='replace')!r}; stderr={errors.decode(errors='replace')!r}"
+            ) from error
+        finally:
+            if channel is not None:
+                channel.close()
 
     def wait_for_connection_lost(self, timeout=60):
         self.logger.error("Waiting until connection is lost")
@@ -200,152 +173,71 @@ class SshTransport(BaseTransport):
         self.logger.debug(f"Waiting for SSH server to start, timeout = {timeout} seconds")
         tm = Timer(timeout)
         self.pause_logging()
-        wait_no_exception_timeout(self.do_ssh_command, timeout, Exception, ":")
-        self.resume_logging()
+        try:
+            wait_no_exception_timeout(self.do_command, timeout, SSHCommandError, ":", time_out=min(10, timeout))
+        finally:
+            self.resume_logging()
         self.logger.debug(f"SSH server active and responsive after {tm.elapsed_time} seconds")
 
     def wait_for_device_detected(self, timeout=20):
         return self.wait_for_ssh_server_responsive(timeout)
 
-    @thread_lock
-    def do_ssh_command(self, command, time_out=10.0, rcvd_timeout=None):
+    def do_ssh_command(self, command, time_out=None, rcvd_timeout=None):
+        """Compatibility entry point using checked execution, never partial output.
+
+        rcvd_timeout, when provided, caps the total timeout instead of specifying
+        an idle receive window. Failure and timeout raise SSHCommandError.
         """
-        execute ssh command non-blocking call to library. asynchronous command must be called with rcvd_timeout>None
-        warning doesn't return an error
-        used for slower/longer responding command like 'ls -Ral /' or avahi-browse.
+        if rcvd_timeout is not None:
+            time_out = self.timeout if time_out is None else time_out
+            for value in (time_out, rcvd_timeout):
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+                    raise ValueError("SSH timeouts must be finite positive numbers")
+            time_out = min(time_out, rcvd_timeout)
+        return self.do_command(command, time_out=time_out)
 
-        Try to avoid using this as it is less stable
+    def exec_command(self, command: str, *, timeout: float | None = None) -> CommandResult:
+        """Return output, exit code and duration; nonzero exit codes are data.
 
-        :param command: command to execute. Supports blocking call command like top/tail by timeout.
-        :param time_out: total timeout in seconds for command (infinite command should be terminated by this timeout)
-        :param rcvd_timeout: timeout in seconds to wait when no data received, default=None then no wait at all"""
-        retval = ""
-        self.logger.info("running '%s' %s %s %s", command, self.username, _hide_password(self.password), self.address)
-
-        retry = 0
-        session = None
-        start_time = time.time()
-        while time_out > time.time() - start_time and session is None:
-            try:
-                session = self.ssh_con.get_transport().open_session()
-            except (OSError, AuthenticationException, SSHException) as excep:
-                self.logger.error("Exception caught after opening session: %s - %s, re-initialize the engine", str(type(excep)), str(excep))
-
-                self.__re_init__()
-                session = self.ssh_con.get_transport().open_session()
-            except Exception as excep:
-                self.logger.error("exception caught of type %s after opening session", str(type(excep)))
-
-                self.logger.error("maybe a reboot was done, will re-initiate session object")
-                self.ssh_con = create_ssh_session_obj_from_hostname(self.address, self.username, self.password, self.port)
-
-                self.logger.info("ssh_con object recreated")
-                session = self.ssh_con.get_transport().open_session()
-                self.logger.info("calling ls /bin/ to check if ssh is open")
-                time.sleep(1)
-                if self.do_command("ls /bin/").strip() != "":
-                    break
-                retry += 1
-                if retry > 5:
-                    raise SSHException("Probably the unit is switched off or rebooting") from excep
-        self.logger.debug("now executing %s", command)
-        session.exec_command(command)
-        time.sleep(0.1)
-        if rcvd_timeout is None:
-            rcvd_timeout = 0.1
-        not_rdy_count = rcvd_timeout * 10
-        buf = "THISISANEMPTY_BUFFEROFTHESSHENGINE"
-        start_time = time.time()
-        while (not_rdy_count > 0 or buf != "") and rcvd_timeout > time.time() - start_time:
-            self.logger.debug(
-                "Data Count=%d RECV: len=%d [%s], left=%f", not_rdy_count, len(buf), buf, rcvd_timeout - (time.time() - start_time)
-            )
-
-            if session.recv_ready():
-                buf = decode_to_str_if_byte(session.recv(4 * 4096))
-                retval += buf
-                if len(buf):
-                    not_rdy_count = rcvd_timeout * 10
-                if len(retval) > 100000000:
-                    raise EmbeddedFrameworkException("return value is larger than 100 MB please do this call via scp")
-
-                self.logger.debug("Data RECV: len=%d, time=%f", len(buf), rcvd_timeout - (time.time() - start_time))
-
-            else:
-                time.sleep(0.1)
-                buf = ""
-                not_rdy_count -= 1
-                self.logger.debug("Data not RDY: %f" % (rcvd_timeout - (time.time() - start_time)))
-
-        if session.recv_stderr_ready():
-            buf = decode_to_str_if_byte(session.recv_stderr(4096))
-            retval += buf
-        return retval
-
-    @thread_lock
-    def _do_command(self, command, time_out=60, re_init_exceptions=()):
+        Duration includes waiting for the shared connection lock. Transport/timeout
+        failures raise SSHCommandError; callers decide whether an exit code fails a test.
         """
-        runs a quick command and returns the stout + stderr (if it exists) as one string
-
-        The time_out parameter is passed to paramiko.SSHClient.exec_command. There are 2 purposes for the timeout.
-
-        - Time limit for opening SSH channel
-        - Time limit for blocking reading/writing
-
-        :param command:
-        :param time_out: in seconds or None for blocking waiting for response.
-        :return: Mixed stdout and stderr
-        :rtype: str
-        """
+        time_out = self.timeout if timeout is None else timeout
+        if not isinstance(command, str) or not command.strip() or "\x00" in command:
+            raise ValueError("SSH command must be non-empty text without NUL characters")
+        if isinstance(time_out, bool) or not isinstance(time_out, (int, float)) or not math.isfinite(time_out) or time_out <= 0:
+            raise ValueError("SSH timeout must be a finite positive number")
+        started = time.perf_counter()
+        if not self._lock.acquire(timeout=time_out):
+            raise SSHCommandError(f"SSH command {command!r} timed out waiting for the connection lock ({time_out}s)")
         try:
-            self.logger.debug("executing %s", command)
-            stdout, exit_status, stderr = self._ssh_exec_command_w_timeout(command, time_out)
-        except (OSError, AuthenticationException, SSHException, *re_init_exceptions) as excep:
-            self.logger.error(
-                "Exception caught after opening session in _do_command: %s - %s, re-initialize the engine", str(type(excep)), str(excep)
-            )
+            remaining = time_out - (time.perf_counter() - started)
+            if remaining <= 0:
+                raise SSHCommandError(f"SSH command {command!r} timed out before execution ({time_out}s)")
+            # A failed response does not prove the command did not run; never replay it.
+            stdout, status, stderr = self._ssh_exec_command_w_timeout(command, remaining)
+            return CommandResult(stdout, status, stderr, duration=time.perf_counter() - started)
+        finally:
+            self._lock.release()
 
-            self.__re_init__()
-            stdout, exit_status, stderr = self._ssh_exec_command_w_timeout(command, time_out)
-        except gevent.hub.LoopExit as excep:
-            self.logger.info("caught exception %s %s", str(type(excep)), str(excep))
-            return
-        except Exception as excep:
-            self.logger.error("_do_command recovery: caught exception type %s, message %s", str(type(excep)), str(excep))
+    execute = exec_command
+    shell = exec_command
 
-            self.ssh_con = create_ssh_session_obj_from_hostname(self.address, self.username, self.password, self.port)
+    def do_command(self, command, time_out=None):
+        """Legacy string API; new callers use execute() and inspect CommandResult."""
+        return self.exec_command(command, timeout=time_out).check(SSHCommandError).stdout
 
-            stdout, exit_status, stderr = self._ssh_exec_command_w_timeout(command, time_out)
-        return stdout, exit_status, stderr
-
-    def do_command(self, command, time_out=60):
-        stdout, _, stderr = self._do_command(command, time_out=time_out, re_init_exceptions=[SSHCommandFailed])
-        ret_val = str(stdout)
-        if stderr:
-            ret_val += str(stderr)
-        self.logger.info(ret_val)
-        return ret_val
-
-    def do_command_w_exitstatus(self, command, time_out=60):
-        return self._do_command(command, time_out=time_out)
+    def do_command_w_exitstatus(self, command, time_out=None):
+        """Legacy tuple API; nonzero status remains available to the caller."""
+        result = self.exec_command(command, timeout=time_out)
+        return result.stdout, result.exit_code, result.stderr
 
     @thread_lock
     def put_files(self, source, destination):
-        """
-        sends a file via scp to a server"""
-        try:
-            self.logger.info("putting %s to %s", source, destination)
-            with scp.SCPClient(self.ssh_con.get_transport(), buff_size=16384, socket_timeout=30.0, progress=None) as scp_conn:
-                scp_conn.put(source, destination, recursive=True, preserve_times=False)
-        except (OSError, AuthenticationException, SSHException, scp.SCPException) as excep:
-            self.logger.error("Exception caught after opening session: %s - %s, re-initialize the engine", str(type(excep)), str(excep))
-            self.__re_init__()
-            self.logger.info("deleting %s before putting the file again", destination)
-            cmd = f"rm -f {destination}"
-            self.do_command(cmd)
-            self.logger.info("putting %s to %s", source, destination)
-            with scp.SCPClient(self.ssh_con.get_transport(), buff_size=16384, socket_timeout=30.0, progress=None) as scp_conn:
-                scp_conn.put(source, destination, recursive=True, preserve_times=False)
+        """Upload once; failures never delete the target or replay a partial upload."""
+        self.logger.info("putting %s to %s", source, destination)
+        with scp.SCPClient(self.ssh_con.get_transport(), buff_size=16384, socket_timeout=30.0, progress=None) as scp_conn:
+            scp_conn.put(source, destination, recursive=True, preserve_times=False)
 
     @thread_lock
     def get_files(self, remote_path, local_path):
@@ -672,8 +564,8 @@ def make_ssh_transport(address: str, username: str, password: str, port: int = 2
     :param password: SSH login password.
     :param port: SSH server port.
     :param retry: Additional connection attempts, following the existing engine.
-    :param timeout: Connection timeout in seconds.
+    :param timeout: Default command budget and timeout per connection attempt, in seconds.
     :returns: Connected SSH engine.
     """
     connection = create_ssh_session_obj_from_hostname(address, username, password, port, retry, timeout)
-    return SshTransport(connection, address, username, password, port)
+    return SshTransport(connection, address, username, password, port, timeout=timeout, retry=retry)

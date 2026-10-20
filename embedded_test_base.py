@@ -79,6 +79,7 @@ class EmbeddedTestCase(BasicTestClass):
     def _collect_linux_coredumps(cls, destination: Path) -> list[Path]:
         """Collect Linux crash files into the current test's artifact directory."""
         collected: list[Path] = []
+        errors = []
         for name, dut in cls.duts.items():
             if not isinstance(dut, LinuxDevice):
                 continue
@@ -88,7 +89,7 @@ class EmbeddedTestCase(BasicTestClass):
                 continue
             paths = dut.config.metadata.get("coredump_paths", CoreDumpHelper.DEFAULT_PATHS)
             if not isinstance(paths, (list, tuple)) or not all(isinstance(path, str) and path for path in paths):
-                cls.logger.warning("Ignoring invalid coredump_paths for %s", name)
+                errors.append(ValueError(f"Invalid coredump_paths for {name}"))
                 continue
             try:
                 helper = CoreDumpHelper(
@@ -96,8 +97,12 @@ class EmbeddedTestCase(BasicTestClass):
                 )
                 files = helper.collect(destination / name, dut.engine(connection).get_files)
                 if files:
-                    cls.logger.warning("Collected coredumps for %s: %s", name, ", ".join(map(str, files)))
+                    cls.logger.warning("Detected coredumps for %s: %s", name, ", ".join(map(str, files)))
                     collected.extend(files)
-            except Exception:  # noqa: BLE001 - artifact collection must not hide the original test result
-                cls.logger.error("Unable to collect coredumps for %s", name)
+            except Exception as error:
+                error.add_note(f"Coredump check failed for DUT {name}")
+                errors.append(error)
+                cls.logger.exception("Unable to check coredumps for %s", name)
+        if errors:
+            raise ExceptionGroup("Coredump checks failed", errors)
         return collected

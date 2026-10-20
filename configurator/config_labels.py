@@ -20,6 +20,7 @@ class Const(object, metaclass=MetaConst):
 
 
 class ENGINES(Const):
+    CAN = "can"
 
     ADB = "adb"
     APPIUM = "appium"
@@ -64,6 +65,7 @@ class PORTS(Const):
 
 
 class LOGGERS(Const):
+    CAN = "can"
 
     MQTT = "mqtt"
     ADB = "adb"

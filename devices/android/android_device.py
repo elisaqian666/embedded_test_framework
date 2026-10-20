@@ -1,24 +1,19 @@
 """Android DUT adapter."""
 
-from embedded_test_framework.devices.base import BaseDevice, Capability, DeviceStateError
+from embedded_test_framework.devices.base import BaseDevice, Capability
 from embedded_test_framework.helpers.he_android import AndroidHelper
-from embedded_test_framework.helpers.he_shell import CommandResult
+from embedded_test_framework.lib.command_result import CommandResult
 
 
 class AndroidDevice(BaseDevice):
-    """Android adapter exposing ADB shell commands."""
+    """Bind Android operations to configured ADB clients owned by BaseDevice."""
 
-    capabilities = frozenset({Capability.ADB})
+    connection_capabilities = {Capability.ADB: frozenset({"adb"}), Capability.SHELL: frozenset({"adb"})}
 
     def adb(self, connection: str | None = None) -> AndroidHelper:
-        self.require(Capability.ADB)
-        return AndroidHelper(self.engine(connection))
+        return AndroidHelper(self.engine(connection, protocol="adb"))
 
-    def execute(self, command: str, timeout: float = 30, *, connection: str | None = None, check: bool = True) -> CommandResult:
-        if timeout <= 0:
-            raise ValueError("Command timeout must be positive")
-        shell = getattr(self.engine(connection), "shell", None)
-        if not callable(shell):
-            raise DeviceStateError("The selected connection does not support ADB shell commands")
-        result = shell(command, timeout=timeout)
-        return result.check() if check else result
+    def execute(self, command: str, timeout: float | None = None, *, connection: str | None = None, check: bool = True) -> CommandResult:
+        return self.adb(connection).shell(command, timeout=timeout, check=check)
+
+    shell = execute

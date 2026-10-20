@@ -1,35 +1,32 @@
-import shlex
-
-from embedded_test_framework.devices.base import BaseDevice, Capability, DeviceStateError
-from embedded_test_framework.helpers.he_shell import CommandResult, ShellHelper
+from embedded_test_framework.devices.base import BaseDevice, Capability
+from embedded_test_framework.helpers.he_linux_host import LinuxHelper
+from embedded_test_framework.lib.command_result import CommandResult
+from embedded_test_framework.protocols.can import CanProtocol
 from embedded_test_framework.protocols.mqtt import MqttProtocol
 
 
 class LinuxDevice(BaseDevice):
-    """Linux adapter with service management through its shell connection."""
+    """Bind Linux operations to configured connections owned by BaseDevice."""
 
-    capabilities = frozenset({Capability.SHELL})
-    connection_capabilities = {Capability.MQTT: frozenset({"mqtt"})}
+    connection_capabilities = {
+        Capability.SHELL: frozenset({"ssh"}),
+        Capability.MQTT: frozenset({"mqtt"}),
+        Capability.CAN: frozenset({"can"}),
+    }
 
-    def execute(self, command: str, timeout: float = 30, *, connection: str | None = None, check: bool = True) -> CommandResult:
-        if timeout <= 0:
-            raise ValueError("Command timeout must be positive")
-        execute = getattr(self.engine(connection), "do_command_w_exitstatus", None)
-        if not callable(execute):
-            raise DeviceStateError("The selected connection does not support shell commands")
-        stdout, status, stderr = execute(command, time_out=timeout)
-        result = CommandResult(stdout, status, stderr)
-        return result.check() if check else result
+    def can(self, connection: str | None = None) -> CanProtocol:
+        return CanProtocol(self.engine(connection, protocol="can"))
 
-    def shell(self, connection: str | None = None) -> ShellHelper:
-        return ShellHelper(self.engine(connection))
+    def linux_host(self, connection: str | None = None) -> LinuxHelper:
+        return LinuxHelper(self.engine(connection, protocol="ssh"))
 
-    def mqtt(self, connection: str = "mqtt") -> MqttProtocol:
-        self.require(Capability.MQTT)
-        return MqttProtocol(self.engine(connection))
+    def mqtt(self, connection: str | None = None) -> MqttProtocol:
+        return MqttProtocol(self.engine(connection, protocol="mqtt"))
 
-    def service(self, name: str, action: str, *, timeout: float = 30) -> CommandResult:
-        self.require(Capability.SHELL)
-        if not name or action not in {"start", "stop", "restart", "status"}:
-            raise ValueError("service name and action must be valid")
-        return self.execute(f"systemctl {action} {shlex.quote(name)}", timeout=timeout, check=action != "status")
+    def service(self, name: str, action: str, *, connection: str | None = None, timeout: float | None = None) -> CommandResult:
+        return self.linux_host(connection).service(name, action, timeout=timeout)
+
+    def execute(self, command: str, timeout: float | None = None, *, connection: str | None = None, check: bool = True) -> CommandResult:
+        return self.linux_host(connection).execute(command, timeout=timeout, check=check)
+
+    shell = execute

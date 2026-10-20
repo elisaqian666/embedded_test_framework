@@ -71,14 +71,9 @@ class SerialTransport(BaseTransport):
         return bool(state if state is not None else self.serial_object.isOpen())
 
     def check_serial_connection_open(self):
-        """check_serial_connection_open: if not open open connection and read buffer"""
+        """Open the connection without consuming device output."""
         self.logger.debug("checking if serial connection is open")
-        connection_opened = self.open_serial_connection()
-        out = None
-        if connection_opened:
-            self.logger.debug("reading line on serial")
-            out = self.serial_object.readline()
-        return out
+        self.open_serial_connection()
 
     def write_command_on_serial(self, cmd, eol="\n"):
         """
@@ -98,22 +93,9 @@ class SerialTransport(BaseTransport):
         self.logger.debug("Command sent on serial port")
 
     def read_line_on_serial(self):
-        """
-        writes specific command for serial connection
-        """
+        """Read one line, bounded by the configured serial read timeout."""
         self.check_serial_connection_open()
-        out = self.serial_object.readline()
-        response = decode_to_str_if_byte(out)
-
-        while out:
-            try:
-                out = decode_to_str_if_byte(self.serial_object.readline())
-                response += out
-            except UnicodeDecodeError as e:
-                self.logger.error(str(e))
-                self.logger.error("Ignoring the junk output:")
-                self.logger.error(out)
-
+        response = decode_to_str_if_byte(self.serial_object.readline())
         self.logger.info("read line on serial: %s", response)
         return response
 

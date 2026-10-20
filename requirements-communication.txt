@@ -5,6 +5,7 @@ paramiko==3.5.1
 paho-mqtt==2.1.0
 pyautogui==0.9.54
 pyserial==3.5
+python-can==4.6.1
 python-jenkins==1.8.3
 requests==2.34.2
 scp==0.16.1

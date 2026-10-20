@@ -52,7 +52,9 @@ def _summary_path(nodeid: str) -> Path:
 
 def _report_text(report: object) -> tuple[str, str]:
     longrepr = getattr(report, "longrepr", None)
-    traceback = getattr(report, "longreprtext", None) or str(longrepr or "No traceback available.")
+    traceback = (
+        getattr(report, "_embedded_traceback", None) or getattr(report, "longreprtext", None) or str(longrepr or "No traceback available.")
+    )
     reprcrash = getattr(longrepr, "reprcrash", None)
     error = getattr(reprcrash, "message", None) or traceback
     captured_logs = getattr(report, "caplog", "")
@@ -92,11 +94,20 @@ def _write_summary(nodeid: str, reports: list[object], failed: bool) -> None:
 
 
 class _TestResultReporter:
+    @pytest.hookimpl(hookwrapper=True)
+    def pytest_runtest_makereport(self, item, call):
+        outcome = yield
+        report = outcome.get_result()
+        if report.failed and call.excinfo is not None:
+            report._embedded_traceback = str(call.excinfo.getrepr(style="long"))
+
     @pytest.hookimpl
     def pytest_runtest_logreport(self, report):
         if report.failed:
             _TEST_RESULTS[report.nodeid] = "FAILED"
             _TEST_FAILURES.setdefault(report.nodeid, []).append(report)
+            _, trace = _report_text(report)
+            logger.error("FAILED %s [%s]\n%s", report.nodeid, report.when, trace)
         elif report.when == "call" and report.passed:
             _TEST_RESULTS.setdefault(report.nodeid, "PASSED")
             _TEST_PASSES[report.nodeid] = report
@@ -249,12 +260,15 @@ class UnittestTestCase:
     def doCleanups(self):
         # Backward compatibility of unittest.TestCase
         cleanups = getattr(self, "_cleanups", [])
+        errors = []
         while cleanups:
             cleanup_func, args, kwargs = cleanups.pop()
             try:
                 cleanup_func(*args, **kwargs)
-            except Exception:
-                logger.exception("Exception during cleanup")
+            except Exception as error:
+                errors.append(error)
+        if errors:
+            raise ExceptionGroup("Test cleanups failed", errors)
 
     @classmethod
     def addClassCleanup(cls, func, *args, **kwargs):  # This name is for compatibility
@@ -264,12 +278,15 @@ class UnittestTestCase:
     @classmethod
     def doClassCleanups(cls):  # This name is for compatibility
         """Copied from unittest.TestCase to ensure compatibility"""
+        errors = []
         while cls._class_cleanups:
             class_cleanup_func, args, kwargs = cls._class_cleanups.pop()
             try:
                 class_cleanup_func(*args, **kwargs)
-            except Exception:
-                logger.exception("Exception occurred during class cleanup: %s", class_cleanup_func)
+            except Exception as error:
+                errors.append(error)
+        if errors:
+            raise ExceptionGroup("Test class cleanups failed", errors)
 
     def skipTest(self, reason):
         raise SkipTest(reason)

@@ -94,7 +94,7 @@ separate MQTT-only device type for an existing DUT.
 need. `he_host_pc.py` handles processes, files,
 screenshots, archives, and Windows facilities; `he_network.py` handles host
 network queries; `he_file.py` handles local/removable-media files;
-`he_shell.py` normalizes command results; `he_auto_gui.py` automates desktop
+`he_linux_host.py` provides Linux operations; `lib/command_result.py` defines command results; `he_auto_gui.py` automates desktop
 UI; `he_image_handling.py` provides image operations; `he_coredump.py`
 collects crash artifacts; `he_jenkins.py` accesses Jenkins; and
 `he_oscilloscope.py` controls RIGOL LAN SCPI. `helpers/__init__.py` is empty

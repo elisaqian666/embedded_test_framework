@@ -1,35 +1,30 @@
 import logging
 import os
-import re
 import sys
+from copy import copy
 from datetime import datetime
 from logging import Formatter, StreamHandler
 from pathlib import Path
 
-_CONFIG = os.getenv("TESTCONFIG", "")
 _TEST_LOG_FOLDER: Path | None = None
 
 
+class _LogFormatter(Formatter):
+    def __init__(self):
+        super().__init__("%(asctime)s %(levelname)s %(name)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+
+    def format(self, record):
+        # Handlers share records; formatting must not change another handler's input.
+        record = copy(record)
+        record.msg = f"{os.getenv('TESTCONFIG', '')}: {record.getMessage()}"
+        record.args = ()
+        return super().format(record)
+
+
 class LogHandler(StreamHandler):
-    def __init__(self, stream=sys.stdout):
-        super().__init__(stream)
-
-        default_formatter = Formatter("%(asctime)s %(levelname)s %(name)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
-        self.setFormatter(default_formatter)
-
-    def _call_super_emit(self, record):
-        """not so nice to have code for better mocking but no other clear way"""
-        super().emit(record)
-
-    def emit(self, record):
-        messages = str(record.msg).splitlines()
-        args = list(record.args)
-        for line in messages:
-            record.msg = f"{_CONFIG}: {line}"
-            number_of_string_subs = len(re.findall(r"%(\d+\.?\d*|\.\d+)?[diouxXeEfFgGcrsab]", line))
-            record.args = tuple(args[:number_of_string_subs])
-            args = args[number_of_string_subs:]
-            self._call_super_emit(record)
+    def __init__(self, stream=None):
+        super().__init__(sys.stdout if stream is None else stream)
+        self.setFormatter(_LogFormatter())
 
 
 def setup_global_logging(log_level: int = logging.INFO, log_file: str | Path | None = None):
@@ -48,7 +43,7 @@ def setup_global_logging(log_level: int = logging.INFO, log_file: str | Path | N
     )
     if log_file and not has_file_handler:
         handler = logging.FileHandler(log_file, encoding="utf-8")
-        handler.setFormatter(Formatter("%(asctime)s %(levelname)s %(name)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
+        handler.setFormatter(_LogFormatter())
         root_logger.addHandler(handler)
 
 

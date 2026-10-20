@@ -59,3 +59,34 @@ def test_read_rejects_invalid_or_incomplete_responses() -> None:
     ):
         with pytest.raises(error):
             ModbusRTUProtocol(FakeTransport(response), 1).read_holding_registers(0)
+
+
+@pytest.mark.parametrize("operation,function", [("read", 0x83), ("write", 0x86)])
+def test_modbus_exception_response_is_reported_without_waiting_for_normal_frame(operation, function):
+    transport = FakeTransport(_frame(1, function, 2))
+    protocol = ModbusRTUProtocol(transport, 1)
+    with pytest.raises(RuntimeError, match="Modbus exception 2"):
+        if operation == "read":
+            protocol.read_holding_registers(0)
+        else:
+            protocol.write_single_register(0, 42)
+    assert len(transport.requests) == 1
+
+
+@pytest.mark.parametrize("written", [0, 1, None])
+def test_modbus_partial_write_fails_before_read_and_is_not_retried(written):
+    from unittest.mock import Mock
+
+    transport = Mock()
+    transport.write.return_value = written
+    with pytest.raises(OSError, match="Incomplete Modbus RTU write"):
+        ModbusRTUProtocol(transport, 1).write_single_register(0, 42)
+    transport.write.assert_called_once()
+    transport.read.assert_not_called()
+
+
+def test_write_exception_still_checks_crc():
+    response = bytearray(_frame(1, 0x86, 2))
+    response[-1] ^= 1
+    with pytest.raises(ValueError, match="CRC"):
+        ModbusRTUProtocol(FakeTransport(response), 1).write_single_register(0, 42)

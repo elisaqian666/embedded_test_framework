@@ -31,7 +31,10 @@ class ModbusRTUProtocol:
     def _send(self, function: int, payload: bytes) -> None:
         self.transport.connect()
         frame = bytes((self.slave_id, function)) + payload
-        self.transport.write(frame + self._crc(frame))
+        frame += self._crc(frame)
+        written = self.transport.write(frame)
+        if written != len(frame):
+            raise OSError(f"Incomplete Modbus RTU write: {written!r} of {len(frame)} bytes; request was not retried")
 
     def _verify(self, response: bytes, function: int) -> None:
         if response[-2:] != self._crc(response[:-2]):
@@ -62,7 +65,8 @@ class ModbusRTUProtocol:
             raise ValueError("address and value must be 0..65535")
         payload = address.to_bytes(2, "big") + value.to_bytes(2, "big")
         self._send(6, payload)
-        response = self._read_exactly(8)
+        header = self._read_exactly(3)
+        response = header + self._read_exactly(2 if header[1] & 0x80 else 5)
         self._verify(response, 6)
         if response[2:6] != payload:
             raise ValueError("Modbus write response does not match request")

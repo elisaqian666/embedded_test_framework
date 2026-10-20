@@ -207,6 +207,7 @@ def load_config(path: str | Path, *, overrides: dict[str, Any] | None = None) ->
 
 
 _FACTORIES = {
+    "can": ("can", "make_can_client"),
     "adb": ("adb", "make_adb_client"),
     "mqtt": ("mqtt", "make_mqtt_client"),
     "ssh": ("ssh", "make_ssh_transport"),
@@ -222,6 +223,7 @@ _FACTORIES = {
     "websocket": ("websocket", "make_websocket_client"),
 }
 _ENGINE_LOGGER_NAMES = {
+    "can": LOGGERS.CAN,
     "adb": LOGGERS.ADB,
     "mqtt": LOGGERS.MQTT,
     "ssh": LOGGERS.SSH_ENGINE,
@@ -278,6 +280,13 @@ class EngineFactory:
             raise ConfigurationError(f"Invalid or missing factory options for protocol: {connection.protocol}") from None
         if connection.protocol not in self._factories:
             self._validate_options(options)
+            if connection.protocol == "can":
+                from embedded_test_framework.communication.can import validate_can_options
+
+                try:
+                    validate_can_options(**options)
+                except ValueError as error:
+                    raise ConfigurationError(str(error)) from None
 
     @staticmethod
     def _validate_options(options: dict[str, Any]) -> None:

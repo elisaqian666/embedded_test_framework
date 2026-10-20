@@ -1,6 +1,7 @@
 """Device adapters and their common connection lifecycle."""
 
 from enum import StrEnum
+from threading import RLock
 from typing import Any, Self
 
 from embedded_test_framework.configurator.configurator_dut import DeviceConfig, EngineFactory
@@ -12,6 +13,7 @@ class DeviceStateError(EmbeddedFrameworkException):
 
 
 class Capability(StrEnum):
+    CAN = "can"
     MQTT = "mqtt"
     MODBUS = "modbus"
     REGISTER_IO = "register_io"
@@ -33,11 +35,12 @@ class BaseDevice:
         self._factory = factory
         self._engines: dict[str, Any] = {}
         self._connected = False
+        self._lock = RLock()
 
     def supports(self, capability: Capability) -> bool:
+        """Report configured capabilities without probing live device health."""
         return capability in self.capabilities or any(
-            connection.protocol in self.connection_capabilities.get(capability, ())
-            for connection in self.config.connections.values()
+            connection.protocol in self.connection_capabilities.get(capability, ()) for connection in self.config.connections.values()
         )
 
     def require(self, capability: Capability) -> None:
@@ -46,46 +49,66 @@ class BaseDevice:
 
     @property
     def is_initialized(self) -> bool:
+        """Whether the connection set is prepared, not whether the DUT is alive."""
         return self._connected
 
     def connect(self) -> Self:
-        if self._connected:
-            return self
-        if self._engines:
-            raise DeviceStateError("Previous cleanup failed; close the DUT before reconnecting")
-        try:
-            for name, connection in self.config.connections.items():
-                if connection.required:
-                    self._engines[name] = self._factory.create(connection)
-            self._connected = True
-        except BaseException as error:
+        with self._lock:
+            if self._connected:
+                return self
+            if self._engines:
+                raise DeviceStateError("Previous cleanup failed; close the DUT before reconnecting")
             try:
-                self.close()
-            except Exception as cleanup_error:  # noqa: BLE001
-                error.add_note(f"DUT initialization cleanup also failed: {type(cleanup_error).__name__}")
-            raise
-        return self
+                for name, connection in self.config.connections.items():
+                    if connection.required:
+                        self._engines[name] = self._factory.create(connection)
+                self._connected = True
+            except BaseException as error:
+                try:
+                    self.close()
+                except Exception as cleanup_error:  # noqa: BLE001
+                    error.add_note(f"DUT initialization cleanup also failed: {type(cleanup_error).__name__}")
+                raise
+            return self
 
-    def engine(self, name: str | None = None) -> Any:
-        if not self._connected:
-            raise DeviceStateError(f"DUT {self.name} is not initialized")
-        name = name or self.config.default_connection
-        if name not in self._engines:
-            self._engines[name] = self._factory.create(self.config.connections[name])
-        return self._engines[name]
+    def engine(self, name: str | None = None, *, protocol: str | None = None) -> Any:
+        """Select an explicit alias, matching default, or unique protocol connection."""
+        with self._lock:
+            if not self._connected:
+                raise DeviceStateError(f"DUT {self.name} is not initialized")
+            if name is not None and (not isinstance(name, str) or not name):
+                raise DeviceStateError("Connection alias must be a non-empty string")
+            if name is None:
+                name = self.config.default_connection
+                if protocol is not None and (name not in self.config.connections or self.config.connections[name].protocol != protocol):
+                    matches = [alias for alias, config in self.config.connections.items() if config.protocol == protocol]
+                    if len(matches) != 1:
+                        raise DeviceStateError(
+                            f"DUT {self.name} requires an explicit connection: found {len(matches)} connections for {protocol}"
+                        )
+                    name = matches[0]
+            if name not in self.config.connections:
+                raise DeviceStateError(f"Unknown connection {name!r} for DUT {self.name}")
+            connection = self.config.connections[name]
+            if protocol is not None and connection.protocol != protocol:
+                raise DeviceStateError(f"Connection {name!r} uses {connection.protocol}, expected {protocol}")
+            if name not in self._engines:
+                self._engines[name] = self._factory.create(connection)
+            return self._engines[name]
 
     def close(self) -> None:
-        self._connected = False
-        errors = []
-        for name, engine in reversed(list(self._engines.items())):
-            try:
-                engine.close()
-            except Exception as error:  # noqa: BLE001
-                errors.append(error)
-            else:
-                del self._engines[name]
-        if errors:
-            raise ExceptionGroup(f"Failed to close connections for DUT {self.name}", errors)
+        with self._lock:
+            self._connected = False
+            errors = []
+            for name, engine in reversed(list(self._engines.items())):
+                try:
+                    engine.close()
+                except Exception as error:  # noqa: BLE001
+                    errors.append(error)
+                else:
+                    del self._engines[name]
+            if errors:
+                raise ExceptionGroup(f"Failed to close connections for DUT {self.name}", errors)
 
     def __enter__(self) -> Self:
         return self.connect()
